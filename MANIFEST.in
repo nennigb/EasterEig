@@ -1,0 +1,3 @@
+include eastereig/PlotRiemann.m
+include figures/classes.svg
+include figures/packages.svg
