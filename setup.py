@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import setuptools
-import subprocess
+#import subprocess
 
 
 with open("README.md", "r") as fh:
@@ -18,7 +18,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/nennigb/EasterEig",
-    packages=['eastereig'],#setuptools.find_packages(), # we can use find_packages() to automatically discover all packages and subpackages
+    packages=setuptools.find_packages(), # we can use find_packages() to automatically discover all packages and subpackages
     install_requires=['numpy',
                       'scipy',
                       'matplotlib<=3.0.0'], # max version for python3.5

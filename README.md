@@ -11,7 +11,9 @@ Consider a parametric eigenvalue problem depending on a parameter \(\nu\). This 
 Exceptional points (EP) of non-Hermitian systems correspond to particular values of the parameter leading to defective eigenvalue.
 At the EP, both eigenvalues and eigenvectors are merging. 
 
-The aim of this package is to **locate** exceptional points and to **reconstruct** the eigenvalue loci. The theoretical part of this work is described in [1], for the location of exceptional points_ and illustrated in [2] for eigenvalue reconstruction in structural dynamics.
+The aim of this package is to **locate** exceptional points and to **reconstruct** the eigenvalue loci. The theoretical part of this work is described in [1], for the location of _exceptional points_ and illustrated in [2] for eigenvalue reconstruction in structural dynamics.
+
+The method requires the computation of successive derivatives of two selected eigenvalues with respect to the parameter so that, after recombination, regular functions can be constructed. This algebraic manipulation permits the localization of exceptional points (EP), using standard root-finding algorithms and the computation of the associated Puiseux series up to an arbitrary order. This representation, which is associated with the topological structure of Riemann surfaces allows to efficiently approximate the selected pair in a certain neighbourhood of the EP.
 
 To use this package :
 
