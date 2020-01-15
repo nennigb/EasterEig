@@ -179,7 +179,9 @@ class NumpyEigSolver(EigSolver):
         if self.pb_type=='std':            
             self.Lda,Vec = sp.linalg.eig(self.K[0],b=None) 
         elif self.pb_type=='gen':            
-            self.Lda,Vec = sp.linalg.eig(self.K[0],b=-self.K[1]) 
+            self.Lda,Vec = sp.linalg.eig(self.K[0],b=-self.K[1])
+        elif self.pb_type=='PEP':
+            self.Lda,Vec = self._pep(self.K)
         else:
             raise NotImplementedError('The pb_type {} is not yet implemented'.format(self.pb_type))
         
@@ -188,7 +190,37 @@ class NumpyEigSolver(EigSolver):
         self.Vec=Vec[:,self.idx]
 
         return self.Lda
-            
+
+    @staticmethod
+    def _pep(K):
+        """ Polynomial eigenvalue solver by linearisation with numpy.
+
+        1st basic version limited to quadratic eigenvalue problem.
+        #TODO read tisseur polyeig ;-)
+
+        Parameters
+        ----------
+        K : List
+            list of matrix. the order is (K[0] + K[1]*lda + K[2]*lda**2)x=0
+        """
+        shape = K[0].shape
+        dtype = K[0].dtype
+        # create auxiliary matrix
+        I = np.eye(*shape, dtype=dtype)
+        Z = np.zeros(shape, dtype=dtype)
+
+        A = np.bmat([[Z, I],
+                     [-K[0], -K[1]]
+                     ])
+        B = np.bmat([[I, Z],
+                     [Z, K[2]]
+                     ])
+        # solved linearised QEP
+        D, V = sp.linalg.eig(A, B)
+        V = V[0:shape[0], :]
+
+        return D, V
+
 
 
 class ScipySpEigSolver(EigSolver):
