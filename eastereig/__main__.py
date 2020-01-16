@@ -35,12 +35,13 @@ from eastereig import utils
 from eastereig import loci
 from eastereig import ep
 from eastereig import lda_func
+from eastereig import eigSolvers
 
 if _petscHere:
     from eastereig.examples import WGimpedance_petsc
 
 # invoke the testmod function to run tests contained in docstring
-mod_list = [lda_func, utils, loci, ep, WGimpedance_numpy, WGimpedance_scipysp, ThreeDoF]
+mod_list = [lda_func, utils, loci, ep, eigSolvers, WGimpedance_numpy, WGimpedance_scipysp, ThreeDoF]
 if _petscHere:
     petsc_list=[WGimpedance_petsc]
     mod_list.extend(petsc_list)

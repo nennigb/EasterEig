@@ -202,6 +202,23 @@ class NumpyEigSolver(EigSolver):
         ----------
         K : List
             list of matrix. the order is (K[0] + K[1]*lda + K[2]*lda**2)x=0
+
+        Examples
+        ---------
+        This example comes from polyeig function in matlab documentation
+        >>> M = np.diag([3, 1, 3, 1])
+        >>> C = np.array([[0.4, 0, -0.3, 0], [0, 0, 0, 0],[-0.3, 0, 0.5, -0.2],[0, 0, -0.2, 0.2]])
+        >>> K = np.array([[-7, 2, 4, 0], [2, -4, 2, 0], [4, 2, -9, 3], [ 0, 0, 3, -3]])
+        >>> lda_ref = np.array([ -2.449849443705628e+00, -2.153616198037310e+00, -1.624778340529248e+00, \
+                                 2.227908732047911e+00, 2.036350976643702e+00, 1.475241143475665e+00, \
+                                 3.352944297785435e-01, -3.465512996736311e-01])
+        >>> x1_ref =  np.array([  -1.827502943493723e-01,    -3.529667428394975e-01,     5.360280532739473e-01,    -7.447756269292356e-01])
+        >>> D,X = NumpyEigSolver._pep([K, C, M])
+        >>> np.linalg.norm(D-lda_ref)<1e-12
+        True
+        >>> x1 = X[:,0]/np.linalg.norm(X[:,0])
+        >>> np.linalg.norm(x1-x1_ref)<1e-12
+        True
         """
         shape = K[0].shape
         dtype = K[0].dtype
@@ -217,6 +234,7 @@ class NumpyEigSolver(EigSolver):
                      ])
         # solved linearised QEP
         D, V = sp.linalg.eig(A, B)
+        # the (N,) eigenvector are normalized to 1.
         V = V[0:shape[0], :]
 
         return D, V
