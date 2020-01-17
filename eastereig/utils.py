@@ -23,14 +23,14 @@ from numpy import zeros, asarray, eye, poly1d, hstack, r_
 from scipy import linalg
 
 def multinomial_index_coefficients(m, n):
-    r"""Return a dictionary containing pairs ``{(k1,k2,..,km) : C_kn}``
+    r"""Return a tuple containing pairs ``((k1,k2,..,km) , C_kn)``
     where ``C_kn`` are multinomial coefficients such that
     ``n=k1+k2+..+km``.
     
     Adapted from sympy sympy/ntheory/multinomial.py to return sorted index (speed up) 
     to be sure that the first index is changing slowly
 
-    Returns:
+    Returns
     --------
         mindex : 
         mcoef :
@@ -86,7 +86,7 @@ def multinomial_index_coefficients(m, n):
             j += 1
             start = j + 1
             v = r[tuple(t)]
-            t[j] += 1        
+            t[j] += 1
         # compute the value
         # NB: the initialization of v was done above
         for k in range(start, m):
@@ -96,12 +96,12 @@ def multinomial_index_coefficients(m, n):
                 t[k] += 1
         t[0] -= 1
         r[tuple(t)] = (v * tj) // (n - t[0])
-        
-        # sort the output to be sure that the first index is changing slowly
-        mindex,mcoef = sortdict(r)
-    return (mindex,mcoef)
-    
-    
+
+    # sort the output to be sure that the first index is changing slowly
+    mindex, mcoef = sortdict(r)
+    return (mindex, mcoef)
+
+
 def sortdict(adict):
     """
     Return a list the sorted keys and the associated list of value
@@ -109,7 +109,8 @@ def sortdict(adict):
     keys = adict.keys()
     sorted_keys = sorted(keys)
     return sorted_keys,[adict[key] for key in sorted_keys]
-    
+
+
 def pade(an, m, n=None):
     """
     Return Pade approximation to a polynomial as the ratio of two polynomials.
@@ -124,9 +125,9 @@ def pade(an, m, n=None):
     m : int
         The order of the returned approximating polynomial `q`.
     n : int, optional
-        The order of the returned approximating polynomial `p`. By default, 
+        The order of the returned approximating polynomial `p`. By default,
         the order is ``len(an)-m``.
-    
+
     Returns
     -------
     p, q : Polynomial class
@@ -140,7 +141,7 @@ def pade(an, m, n=None):
     >>> p, q = pade(e_exp, 2)
     >>> p(1)/q(1)
     (2.7179487179487...+0j)
-    
+
     Compute Taylor exp(1+1j+x) @ x=0
     >>> e_expc = np.array([1.4686939399158851  +2.2873552871788423j, 1.4686939399158851  +2.2873552871788423j, \
                            0.7343469699579426  +1.1436776435894211j, 0.24478232331931418 +0.3812258811964737j, \
@@ -163,12 +164,11 @@ def pade(an, m, n=None):
     Akj = eye(N+1, n+1, dtype=an.dtype)
     Bkj = zeros((N+1, m), dtype=an.dtype)
     for row in range(1, m+1):
-        Bkj[row,:row] = -(an[:row])[::-1]
+        Bkj[row, :row] = -(an[:row])[::-1]
     for row in range(m+1, N+1):
-        Bkj[row,:] = -(an[row-m:row])[::-1]
+        Bkj[row, :] = -(an[row-m:row])[::-1]
     C = hstack((Akj, Bkj))
     pq = linalg.solve(C, an)
     p = pq[:n+1]
     q = r_[1.0, pq[n+1:]]
     return poly1d(p[::-1]), poly1d(q[::-1])
-
