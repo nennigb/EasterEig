@@ -196,7 +196,7 @@ class NumpyEigSolver(EigSolver):
         """ Polynomial eigenvalue solver by linearisation with numpy.
 
         1st basic version limited to quadratic eigenvalue problem.
-        #TODO read tisseur polyeig ;-)
+        #TODO Need to compare with F. Tisseur polyeig.
 
         Parameters
         ----------
@@ -234,7 +234,7 @@ class NumpyEigSolver(EigSolver):
                      ])
         # solved linearised QEP
         D, V = sp.linalg.eig(A, B)
-        # the (N,) eigenvector are normalized to 1.
+        # the (2*N,) eigenvector are normalized to 1.
         V = V[0:shape[0], :]
 
         return D, V
@@ -245,14 +245,12 @@ class ScipySpEigSolver(EigSolver):
     """ Define the concrete interface common to all numpy Eigenvalue solver
     
     The eigenvalue problem is solved with numpy for full matrix
-    
-    #TODO add PEP by linearization
-    
+        
     """
     # keep trace of the lib
-    _lib='scipysp'      
+    _lib = 'scipysp'      
     
-    def solve(self,nev=6,target=0+0j,skipsym=False):
+    def solve(self, nev=6, target=0+0j, skipsym=False):
         """ Solve the eigenvalue problem and get back the results as (Lda, X)
         
         Parameters
@@ -270,9 +268,11 @@ class ScipySpEigSolver(EigSolver):
         """   
         print('> Solve eigenvalue {} problem with {} class...\n'.format(self.pb_type,self.__class__.__name__))
         if self.pb_type=='std':            
-            self.Lda,Vec = eigs(self.K[0], k=nev, M=None, sigma=target, return_eigenvectors=True) 
-        elif self.pb_type=='gen':            
-            self.Lda,Vec = eigs(self.K[0], k=nev, M=-self.K[1], sigma=target, return_eigenvectors=True) 
+            self.Lda, Vec = eigs(self.K[0], k=nev, M=None, sigma=target, return_eigenvectors=True)
+        elif self.pb_type=='gen':
+            self.Lda, Vec = eigs(self.K[0], k=nev, M=-self.K[1], sigma=target, return_eigenvectors=True)
+        elif self.pb_type=='PEP':
+            self.Lda, Vec = self._pep(self.K, k=nev, sigma=target, return_eigenvectors=True)
         else:
             raise NotImplementedError('The pb_type {} is not yet implemented'.format(self.pb_type))
         
@@ -281,6 +281,56 @@ class ScipySpEigSolver(EigSolver):
         self.Vec=Vec[:,self.idx]
 
         return self.Lda
+
+    @staticmethod
+    def _pep(K, k=4, sigma=0.):
+        """ Polynomial eigenvalue solver by linearisation with scipy sparse.
+
+        1st basic version limited to quadratic eigenvalue problem.        
+
+        Parameters
+        ----------
+        K : List
+            list of matrix. the order is (K[0] + K[1]*lda + K[2]*lda**2)x=0
+        k : Int
+            The number of requested eigenpairs.
+        sigma : complex
+            The value arround which eigenvalues are looked for.
+
+        Examples
+        ---------
+        This example comes from polyeig function in matlab documentation
+        >>> M = sp.sparse.csc_matrix(np.diag([3, 1, 3, 1]), dtype=np.complex)
+        >>> C = sp.sparse.csc_matrix(np.array([[0.4, 0, -0.3, 0], [0, 0, 0, 0],[-0.3, 0, 0.5, -0.2],[0, 0, -0.2, 0.2]], dtype=np.complex))
+        >>> K = sp.sparse.csc_matrix(np.array([[-7, 2, 4, 0], [2, -4, 2, 0], [4, 2, -9, 3], [ 0, 0, 3, -3]], dtype=np.complex))
+        >>> lda_ref = np.array([ -2.153616198037310e+00, -1.624778340529248e+00,  2.036350976643702e+00, 1.475241143475665e+00, \
+                                 3.352944297785435e-01, -3.465512996736311e-01])
+        >>> x1_ref =  np.array([-3.421456419701390e-01, 9.295577535525387e-01, 4.558756372896405e-02, -1.295396330257916e-01]) 
+        >>> D,X = ScipySpEigSolver._pep([K, C, M], k=6)
+        >>> ind=np.argsort(D)  # normally -2.15 is the first
+        >>> np.linalg.norm(D[ind] - np.sort(lda_ref))<1e-12
+        True
+        >>> x1 = X[:,ind[0]]/np.linalg.norm(X[:,ind[0]]) # assume X[:,0] <-> lda=-2.15
+        >>> np.linalg.norm(np.abs(x1)- np.abs(x1_ref))<1e-12
+        True
+        """
+        shape = K[0].shape
+        dtype = K[0].dtype
+        # create auxiliary matrix
+        I = sp.sparse.eye(*shape, dtype=dtype).tocsc()
+        Z = None
+        #fixme see the impact of .tocsc
+        A = sp.sparse.bmat([[Z, I],
+                            [-K[0], -K[1]]
+                            ], dtype=dtype).tocsc()
+        B = sp.sparse.bmat([[I, Z],
+                            [Z, K[2]]
+                            ], dtype=dtype).tocsc()
+        # solved linearised QEP
+        D, V = eigs(A, k=k, M=B, sigma=sigma, return_eigenvectors=True)
+        # the (2*N,) eigenvector are normalized to 1.
+        V = V[0:shape[0], :]
+        return D, V
 
 
 # define only if petsc and slepc are present
