@@ -248,7 +248,7 @@ class ScipySpEigSolver(EigSolver):
         
     """
     # keep trace of the lib
-    _lib = 'scipysp'      
+    _lib = 'scipysp'
     
     def solve(self, nev=6, target=0+0j, skipsym=False):
         """ Solve the eigenvalue problem and get back the results as (Lda, X)
@@ -265,20 +265,20 @@ class ScipySpEigSolver(EigSolver):
         Remarks
         --------
         For full matrix all eigenvalues are obtained. nev is not used.
-        """   
+        """
         print('> Solve eigenvalue {} problem with {} class...\n'.format(self.pb_type,self.__class__.__name__))
-        if self.pb_type=='std':            
+        if self.pb_type == 'std':
             self.Lda, Vec = eigs(self.K[0], k=nev, M=None, sigma=target, return_eigenvectors=True)
-        elif self.pb_type=='gen':
+        elif self.pb_type == 'gen':
             self.Lda, Vec = eigs(self.K[0], k=nev, M=-self.K[1], sigma=target, return_eigenvectors=True)
-        elif self.pb_type=='PEP':
-            self.Lda, Vec = self._pep(self.K, k=nev, sigma=target, return_eigenvectors=True)
+        elif self.pb_type == 'PEP':
+            self.Lda, Vec = self._pep(self.K, k=nev, sigma=target)
         else:
             raise NotImplementedError('The pb_type {} is not yet implemented'.format(self.pb_type))
-        
+
         # sort eigenvectors and create idx index
         self.sort(skipsym=skipsym)    
-        self.Vec=Vec[:,self.idx]
+        self.Vec = Vec[:, self.idx]
 
         return self.Lda
 
@@ -319,7 +319,7 @@ class ScipySpEigSolver(EigSolver):
         # create auxiliary matrix
         I = sp.sparse.eye(*shape, dtype=dtype).tocsc()
         Z = None
-        #fixme see the impact of .tocsc
+        # FIXME see the impact of .tocsc
         A = sp.sparse.bmat([[Z, I],
                             [-K[0], -K[1]]
                             ], dtype=dtype).tocsc()
@@ -340,7 +340,7 @@ if _petscHere:
         
         Configured to use shift and invert transform with mumps
         """
-        #todo if move into fonction, no need to add a test if poetscHere ?
+        # TODO if move into fonction, no need to add a test if poetscHere ?
         PB_TYPE_FACTORY = {
             'std':SLEPc.EPS,
             'gen':SLEPc.EPS,
