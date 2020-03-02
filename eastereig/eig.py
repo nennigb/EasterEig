@@ -81,7 +81,7 @@ class AbstractEig(ABC):
         the list of the sucessive derivatives of lda % nu
     """
     
-    def __init__(self,lib,lda=None,x=None):
+    def __init__(self, lib, lda=None, x=None):
         """ Init the instance
         """
         self._lib=lib
@@ -103,7 +103,7 @@ class AbstractEig(ABC):
         return "Instance of {}  @lda={} with #{} derivatives".format(self.__class__.__name__, self.lda, len(self.dlda))
 
     @abstractmethod    
-    def export(self,filename,eigenvec=True):
+    def export(self, filename, eigenvec=True):
         """ Export the eigenvalue and the eigenvector derivatives (if eigenvect=True) into a file
         
         The exported format depend on the matrix format lib.
@@ -118,8 +118,8 @@ class AbstractEig(ABC):
         """
         pass
     
-    @abstractmethod      
-    def load(self,filename,eigenvec=True):
+    @abstractmethod
+    def load(self, filename, eigenvec=True):
         """ Load an Eig object saved in a file
             
         Parameters
@@ -133,14 +133,15 @@ class AbstractEig(ABC):
         """
         pass
             
-    def addD(self,dlda,dx):
+    def addD(self, dlda, dx):
         """  add new derivatives
         """
         self.dlda.extend(dlda)
-        self.dx.extend(dx)
+        if dx:
+            self.dx.extend(dx)
     
-    @abstractmethod            
-    def getDerivatives(self,N,L):
+    @abstractmethod
+    def getDerivatives(self, N, L):
         """ Compute the successive derivative of an eigenvalue of an OP instance
         
         Parameters
@@ -155,7 +156,7 @@ class AbstractEig(ABC):
         pass
         
         
-    def taylor(self,points, n=-1):
+    def taylor(self, points, n=-1):
         """
         Evaluate the Taylor expansion of order n at `points`.
         
@@ -777,16 +778,18 @@ class ScipyspEig(AbstractEig):
         # if N > 1 loop for higher order terms
         print('> Linear solve...')
         # n start now at 1 for uniformization
-        for n in range(1,N+1):                       
+        for n in range(1, N+1):
             # compute RHS
             tic = time.time() # init timer 
-            Ftemp=op.getRHS(self,n)
+            Ftemp=op.getRHS(self, n)
             #F= sp.bmat([Ftemp, Zerv]).reshape(-1,1)
             F= np.concatenate((Ftemp, Zerv))
             print("              # getRHS real time :", time.time()-tic)             
            
             tic = time.time() # init timer  
-            if n==1:
+            if n == 1:
+                # umfpack is not in scipy but need to be installed with scikit-umfpack
+                # if not present, scipy use superlu
                 sp.sparse.linalg.use_solver(useUmfpackbool=True)
                 # compute the lu factor                
                 lusolve=sp.sparse.linalg.factorized(Bord)
