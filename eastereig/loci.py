@@ -81,9 +81,16 @@ class Loci:
         L = Loci(LAMBDA,NU)
         return L
         
-    def export(self,LAMBDAfile):
-        pass
-        
+    def export(self, LAMBDAfile):
+        """ Convert and export to numpy file format.
+
+        Parameters
+        ----------
+        LAMBDAfile: string
+            file to save the data
+        """
+        np.savez(LAMBDAfile, LAMBDA=self.LAMBDA, NU=self.NU)
+
     
     def plotRiemannMatlab(self,part,eng,n=3,label=['$\nu$','$\lambda']):
         """
