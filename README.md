@@ -1,4 +1,4 @@
-# EasterEig
+EasterEig
 ------------
 
 Consider a parametric [eigenvalue](https://en.wikipedia.org/wiki/Eigenvalues_and_eigenvectors) problem depending on a parameter \(\nu\). This arises for instance in
@@ -37,7 +37,7 @@ References
 .. [2] M. Ghienne and B. Nennig (2019). Beyond the limitations of perturbation methods for real random eigenvalue problems using Exceptional Points and analytic continuation. submitted to journal of sound and vibrations.
        
 
-## Basic workflow and class hierarchy
+Basic workflow and class hierarchy
 --------------------------------------
 
 `eastereig` provides several top level classes
@@ -47,7 +47,7 @@ References
   3. **EP class**, combines Eig object to locate EP and compute Puiseux series
   4. **Loci class**, allows easy Riemann surface plotting
 
-## Dependencies
+ Dependencies
 --------------------------------------
 `eastereig` is based on numpy (full) and scipy (sparse) for most internal computation and can handle _large_ parallel sparse matrices thanks to **optional** import of [petsc4py](https://petsc4py.readthedocs.io/en/stable/install.html) (and mumps), 
 [slepc4py](https://slepc4py.readthedocs.io/en/stable/install.html) and
@@ -76,7 +76,7 @@ or in _editable_ mode if you want to modify the sources
 pip3 install -e path/to/EeasterEig
 ```
 
-## Running tests
+Running tests
 -------------------------------------
 Tests are handled with doctest. To call the test procedure, simply execute the package
 ```
@@ -84,7 +84,7 @@ python3 -m eastereig
 ```
 
 
-## View documentation
+Documentation
 --------------------------------------
 The doctring are compatible with several Auto-generate API documentation, like pdoc
 ```
@@ -100,7 +100,7 @@ dot -Tsvg classes.dot -o classes.svg
 ```
 To generate this documentation, you can use `./makedoc.py` script.
 
-## Getting started
+Getting started
 --------------------
 Several working examples are available in `./examples/` folder
   
@@ -181,7 +181,7 @@ class MyOP(ee.OP):
 ```
 
 
-## License
+License
 --------------------
 This file is part of eastereig, a library to locate exceptional points and to reconstruct eigenvalues loci.
 
