@@ -58,16 +58,28 @@ Tested for python 3.5
 > To run an example with petsc (parallel), you need to run python with `mpirun`. For instance, to run a program with 2 proc
 > `mpirun -n 2 python3 myprog.py`
 
-## Install (without pip)
+Install 
 --------------------------------------
+You'll need:
+* python; 
+* python3-tk library;
+* pip3 (optional).
+
+### Using custom script
+Go to root folder.
+
+Run:
 ```
 python3 setup.py install [--user]
 ```
-for frequent updates (dev) it is better to use 
+To get the lastest updates (dev relases), run: 
 ```
 python3 setup.py develop [--user]
 ```
-or preferably using `pip3` as explain [here](https://pip.pypa.io/en/stable/reference/pip_install/)
+### Using pip
+Consider using `pip3` over custom script (rationale [here](https://pip.pypa.io/en/stable/reference/pip_install/))
+
+Run:
 ```
 pip3 install path/to/EeasterEig-version.tar.gz [--user]
 ```
@@ -78,27 +90,37 @@ pip3 install -e path/to/EeasterEig
 
 Running tests
 -------------------------------------
-Tests are handled with doctest. To call the test procedure, simply execute the package
+Tests are handled with doctest. 
+
+To execute the full test suite, run :
 ```
 python3 -m eastereig
 ```
 
-
 Documentation
 --------------------------------------
-The doctring are compatible with several Auto-generate API documentation, like pdoc
+
+## Generate documentation 
+Run: 
 ```
 pdoc3 --html --force --config latex_math=True  eastereig
 ```
+N.B: The doctring are compatible with several Auto-generate API documentation, like pdoc.
 This notably allows to see latex includes.
 
-The class diagramm can be obtained with `pyreverse` (installed with pylint and spyder)
+## Generate class diagram
+Run: 
 ```
 pyreverse -s0 eastereig -m yes -f ALL
 dot -Tsvg classes.dot -o classes.svg
-
 ```
-To generate this documentation, you can use `./makedoc.py` script.
+N.B: Class diagram generation is done using `pyreverse` (installed with pylint and spyder).
+
+## Generate documentation and class diagram
+Run:
+```
+python3 ./makedoc.py
+```
 
 Getting started
 --------------------
