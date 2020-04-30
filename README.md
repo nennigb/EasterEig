@@ -32,9 +32,9 @@ If eastereig is useful for your research, please cite the following references. 
 References
 ----------
 
-.. [1] B. Nennig and E. Perrey-Debain (2019). A high order continuation method to locate exceptional points and to compute Puiseux series with applications to acoustic waveguides. J. Comp. Phys., 109425, (2020). [doi](https://dx.doi.org/10.1016/j.jcp.2020.109425) [open access](https://arxiv.org/abs/1909.11579)
+.. [1] B. Nennig and E. Perrey-Debain (2019). A high order continuation method to locate exceptional points and to compute Puiseux series with applications to acoustic waveguides. J. Comp. Phys., 109425, (2020). [doi](https://dx.doi.org/10.1016/j.jcp.2020.109425); [open access](https://arxiv.org/abs/1909.11579)
 
-.. [2] M. Ghienne and B. Nennig (2019). Beyond the limitations of perturbation methods for real random eigenvalue problems using Exceptional Points and analytic continuation. accepted in journal of sound and vibrations. [open access](https://hal.archives-ouvertes.fr/hal-02536849)
+.. [2] M. Ghienne and B. Nennig (2020). Beyond the limitations of perturbation methods for real random eigenvalue problems using Exceptional Points and analytic continuation. Journal of Sound and vibration. [doi](https://doi.org/10.1016/j.jsv.2020.115398); [open access](https://hal.archives-ouvertes.fr/hal-02536849)
        
 
 Basic workflow and class hierarchy
