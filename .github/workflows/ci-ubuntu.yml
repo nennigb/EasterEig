@@ -1,0 +1,48 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+
+name: CI-Ubuntu
+
+on:
+  push:
+    branches: [ master]
+    paths-ignore:         # Don't trigger on files that are updated by the CI
+      - README.md
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.5
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+    # - name: Lint with flake8
+    #   run: |
+    #     pip install flake8
+    #     # stop the build if there are Python syntax errors or undefined names
+    #     flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    #     # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+    #     flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Install the package
+      run: |
+        pip install -e .
+    - name: Run test without petsc
+      run: |
+        python -m eastereig
+    - name: Install petsc and their dependencies (support for parallel matrices)
+      run: |
+        sudo apt update --yes
+        sudo apt-get install mpich --yes
+        pip install mpi4py
+        export PETSC_CONFIGURE_OPTIONS='--download-f2cblaslapack=1 --download-scalapack --download-mumps --with-scalar-type=complex'
+        pip install petsc petsc4py
+        pip install slepc slepc4py
+    - name: Run test with petsc
+      run: |
+        python -m eastereig

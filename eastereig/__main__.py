@@ -16,16 +16,17 @@
 # You should have received a copy of the GNU General Public License
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
 
-""" 
-Use this file to run the doctest when the module is run
+"""
+Run the doctest.
 
 Example
 -------
 ```
-python3 eastereig
+python3 -m eastereig
 ```
 """
 import doctest
+import sys
 from eastereig import _petscHere
 # immport the file containing the doctest
 from eastereig.examples import WGimpedance_numpy
@@ -41,37 +42,33 @@ if _petscHere:
     from eastereig.examples import WGimpedance_petsc
 
 # invoke the testmod function to run tests contained in docstring
-mod_list = [lda_func, utils, loci, ep, eigSolvers, WGimpedance_numpy, WGimpedance_scipysp, ThreeDoF]
+mod_list = [lda_func, utils, loci, ep, eigSolvers, WGimpedance_numpy,
+            WGimpedance_scipysp, ThreeDoF]
 if _petscHere:
-    petsc_list=[WGimpedance_petsc]
+    petsc_list = [WGimpedance_petsc]
     mod_list.extend(petsc_list)
 
+if __name__ == '__main__':
+    Stats = []
+    for mod in mod_list:
+        print("--------------------------------------------------------- \n",
+              "> Testing :  {} \n".format(mod.__name__),
+              "--------------------------------------------------------- \n ")
+        # possible to use the directive "# doctest: +ELLIPSIS" or optionflags=doctest.ELLIPSIS in testmod
+        # it enable the ellipsis '...' for truncate expresion. usefull for float (but be careful)
+        stat = doctest.testmod(m=mod, optionflags=doctest.ELLIPSIS, verbose=False)  # name=mod.__name__, verbose=True
+        print(stat)
+        Stats.append(stat)
 
-Stats=[]
-for mod in mod_list:
-    print( "--------------------------------------------------------- \n\
-     > Testing :  {} \n\
---------------------------------------------------------- \n ".format(mod.__name__))
-    # possible to use the directive "# doctest: +ELLIPSIS" or optionflags=doctest.ELLIPSIS in testmod
-    # it enable the ellipsis '...' for truncate expresion. usefull for float (but be careful)
-    stat=doctest.testmod(m=mod,optionflags=doctest.ELLIPSIS,verbose=False) #name=mod.__name__, verbose=True
-    print(stat)
-    Stats.append(stat)
-
-
-#summary, with petsc out put sometime hard to read
-print("\n","================ Testing summary ===================")
-for i,mod in enumerate(mod_list):
-    print(" > Testing :  {}".format(mod.__name__))
-    print("    " ,Stats[i])
-    print("\n")
-if sum([i.failed for i in Stats ])==0:
-    print("                                            Pass :-)")
-    Pass=True
-else:
-    print("                                          Failed :-(")
-    Pass=False
-print("====================================================")
-
-
-
+    # Summary, with petsc out put sometime hard to read
+    print("\n", "================ Testing summary ===================")
+    for i, mod in enumerate(mod_list):
+        print(" > Testing :  {}".format(mod.__name__))
+        print("    ", Stats[i])
+    if sum([i.failed for i in Stats]) == 0:
+        print("                                            Pass :-)")
+        sys.exit(0)
+    else:
+        print("                                          Failed :-(")
+        sys.exit(1)
+    print("====================================================")
