@@ -1,5 +1,6 @@
 EasterEig
 =========
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) ![CI-Ubuntu](https://github.com/nennigb/EasterEig/workflows/CI-Ubuntu/badge.svg)
 
 Consider a parametric eigenvalue problem depending on a parameter \(\nu\). This arises for instance in
 
@@ -32,15 +33,15 @@ If eastereig is useful for your research, please cite the following references. 
 References
 ----------
 
-.. [1] B. Nennig and E. Perrey-Debain (2019). A high order continuation method to locate exceptional points and to compute Puiseux series with applications to acoustic waveguides. J. Comp. Phys., 109425, (2020). [doi](https://dx.doi.org/10.1016/j.jcp.2020.109425); [open access](https://arxiv.org/abs/1909.11579)
+   [1] B. Nennig and E. Perrey-Debain. A high order continuation method to locate exceptional points and to compute Puiseux series with applications to acoustic waveguides. J. Comp. Phys., 109425, (2020). [[doi](https://dx.doi.org/10.1016/j.jcp.2020.109425)]; [[open access](https://arxiv.org/abs/1909.11579)]
 
-.. [2] M. Ghienne and B. Nennig (2020). Beyond the limitations of perturbation methods for real random eigenvalue problems using Exceptional Points and analytic continuation. Journal of Sound and vibration. [doi](https://doi.org/10.1016/j.jsv.2020.115398); [open access](https://hal.archives-ouvertes.fr/hal-02536849)
+   [2] M. Ghienne and B. Nennig. Beyond the limitations of perturbation methods for real random eigenvalue problems using Exceptional Points and analytic continuation. Journal of Sound and vibration, (2020). [[doi](https://doi.org/10.1016/j.jsv.2020.115398)]; [[open access](https://hal.archives-ouvertes.fr/hal-02536849)]
        
 
 Basic workflow and class hierarchy
 ----------------------------------
 
-`eastereig` provides several top level classes
+`eastereig` provides several top level classes:
 
   1. **OP class**, defines operators of your problem
   2. **Eig class**, handles eigenvalues, their derivatives and reconstruction
@@ -57,37 +58,38 @@ Tested for python 3.5
 
 > **Remarks :**
 > To run an example with petsc (parallel), you need to run python with `mpirun`. For instance, to run a program with 2 proc
-> `mpirun -n 2 python3 myprog.py`
+> `mpirun -n 2 python myprog.py`
 
 Install 
 --------
 
 You'll need : 
 * python (tested for v >= 3.5);
-* pip3 (optional).
+* pip (optional).
+Note that on ubuntu, you will need to use `pip3` instead of `pip` and `python3` instead of `python`. Please see the steps given in the continous integration script [workflows](.github/workflows/ci-ubuntu.yml).
+
+### Using pip (preferred)
+Consider using `pip` over custom script (rationale [here](https://pip.pypa.io/en/stable/reference/pip_install/))
+
+Run:
+```
+pip install path/to/EeasterEig-version.tar.gz [--user]
+```
+or in _editable_ mode if you want to modify the sources
+```
+pip install -e path/to/EeasterEig
+```
 
 ### Using python setuptools
 Go to root folder.
 and run:
 ```
-python3 setup.py install [--user]
+python setup.py install [--user]
 ```
 
 To get the lastest updates (dev relases), run: 
 ```
-python3 setup.py develop [--user]
-```
-
-### Using pip
-Consider using `pip3` over custom script (rationale [here](https://pip.pypa.io/en/stable/reference/pip_install/))
-
-Run:
-```
-pip3 install path/to/EeasterEig-version.tar.gz [--user]
-```
-or in _editable_ mode if you want to modify the sources
-```
-pip3 install -e path/to/EeasterEig
+python setup.py develop [--user]
 ```
 
 Running tests
@@ -96,7 +98,7 @@ Tests are handled with doctest.
 
 To execute the full test suite, run :
 ```
-python3 -m eastereig
+python -m eastereig
 ```
 
 Documentation
@@ -121,11 +123,12 @@ N.B: Class diagram generation is done using `pyreverse` (installed with pylint a
 ## Generate documentation and class diagram
 Both aspects are included in the `makedoc.py' script. So, just run :
 ```
-python3 ./makedoc.py
+python ./makedoc.py
 ```
 
 Getting started
 ---------------
+
 Several working examples are available in `./examples/` folder
   
   1. Acoustic waveguide with an impedance boundary condition (with the different supported linear libraries)
