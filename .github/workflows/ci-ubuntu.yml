@@ -4,7 +4,7 @@ name: CI-Ubuntu
 
 on:
   push:
-    branches: [ master]
+    branches: [ '*' ]
     paths-ignore:         # Don't trigger on files that are updated by the CI
       - README.md
   pull_request:
@@ -13,12 +13,18 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.5, 3.8]        
+    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v1
       with:
-        python-version: 3.5
+        python-version: ${{ matrix.python-version }}
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
