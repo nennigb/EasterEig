@@ -241,7 +241,7 @@ class OP(ABC):
                     if m[0]!=m0old:
                         # if matrix order derivative has changed since last computation, compute it
                         dK_m0_ = self.dK[Kid](m[0])
-                    if dK_m0_ is not 0: 
+                    if dK_m0_ is not int(0):
                         # if matrix derivative do not vanish...
                         dK_m0 = adaptMat(dK_m0_,lib) # FIXME may be 0
                         dx_m1 = adaptVec(vp.dx[m[1]], lib)       # normaly never 0
