@@ -21,7 +21,7 @@ setuptools.setup(
     packages=setuptools.find_packages(), # we can use find_packages() to automatically discover all packages and subpackages
     install_requires=['numpy',
                       'scipy',
-                      'matplotlib<=3.0.0'], # max version for python3.5
+                      'matplotlib<=3.0.1'], # max version for python3.5
     classifiers=[
         "Programming Language :: Python :: 3.5",
         "License :: OSI Approved :: GPL 3",
