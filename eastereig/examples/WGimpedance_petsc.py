@@ -61,7 +61,7 @@ Get 10 st puiseux series coefficients of 1st EP and check their value
 True
 
 Check also eigenvalue derivatives
->>> dlda = vp1.dlda[0:5]
+>>> dlda = EP1._vp1dlda[0:5]
 >>> dlda_ref = np.array([(8.183663044141067+4.39391090652107j), (-0.018451689720575804+0.007103750315344242j),\
     (2.7619229792202445e-05-0.00021888073028013003j), (3.938676110910742e-06+3.954262823086467e-06j), (-2.3488744896828321e-07+9.16775969596652e-09j)])
 >>> np.linalg.norm(np.abs(dlda - dlda_ref)) <1e-8
