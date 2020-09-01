@@ -1,3 +1,4 @@
 include eastereig/PlotRiemann.m
+include eastereig/VERSION
 include figures/classes.svg
 include figures/packages.svg

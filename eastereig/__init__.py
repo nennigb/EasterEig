@@ -33,6 +33,7 @@ EasterEig  -- A library to locate exceptional points and to reconstruct eigenval
 """
 import importlib as _importlib
 import numpy as _np
+import os
 
 # usefull also to pdoc
 __all__= ['OP','Eig','EP','Loci','gopts']
@@ -44,6 +45,18 @@ if _importlib.util.find_spec('petsc4py'):
 else:
     _petscHere=False
 
+# link to version
+def _getversion():
+    """ Get version from VERSION."""
+    v = None
+    with open(os.path.join(os.path.dirname(__file__), 'VERSION')) as f:
+        for line in f:
+            if line.startswith('version'):
+                v = line.replace("'", '').split()[-1].strip()
+                break
+        return v
+
+__version__ = _getversion()
 
 # define usefull constante
 _CONST=_np.array([4.715922776012983e+257+2.3562408023262842e+251j,
