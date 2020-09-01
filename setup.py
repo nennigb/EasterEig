@@ -32,8 +32,8 @@ setuptools.setup(
     include_package_data=True,
     # we can use find_packages() to automatically discover all subpackages
     packages=setuptools.find_packages(),
-    install_requires=['numpy',
-                      'scipy',
+    install_requires=['numpy<=1.18.5', # max version for python3.5
+                      'scipy<=1.4.1',  # max version for python3.5
                       'matplotlib<=3.0.1'], # max version for python3.5
     classifiers=[
         "Programming Language :: Python :: 3",
