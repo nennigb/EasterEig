@@ -1,15 +1,13 @@
 # Byte-code
 __pycache__/
 *.py[cod]
-*.pdf
-*.pdf
 
 # Distribution / packaging
 *.egg-info/
 build/
+dist/
 
 # pdoc
 html/
 *.html
 *.dot
-
