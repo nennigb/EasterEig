@@ -69,9 +69,13 @@ You'll need :
 Note that on ubuntu, you will need to use `pip3` instead of `pip` and `python3` instead of `python`. Please see the steps given in the continous integration script [workflows](.github/workflows/ci-ubuntu.yml).
 
 ### Using pip (preferred)
-Consider using `pip` over custom script (rationale [here](https://pip.pypa.io/en/stable/reference/pip_install/))
+Consider using `pip` over custom script (rationale [here](https://pip.pypa.io/en/stable/reference/pip_install/)). 
 
-Run:
+You can install `eastereig` either from pypi (main releases only):
+```
+pip install eastereig [--user]
+``` 
+or from github:
 ```
 pip install path/to/EeasterEig-version.tar.gz [--user]
 ```
