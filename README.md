@@ -83,7 +83,7 @@ or in _editable_ mode if you want to modify the sources
 ```
 pip install -e path/to/EeasterEig
 ```
-> The specified versions in `install_requires` field from `setup.py` are given to ensure the backward compatibility up to python 3.5. You can safely use a more recent version for recent python version. 
+> The version of the required libraries specified in `install_requires` field from `setup.py` are given to ensure the backward compatibility up to python 3.5. A more recent version of these libraries can be safely used for recent python version. 
 
 ### Using python setuptools
 Go to root folder.
