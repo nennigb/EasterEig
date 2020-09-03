@@ -1,6 +1,6 @@
 EasterEig
 =========
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) ![CI-Ubuntu](https://github.com/nennigb/EasterEig/workflows/CI-Ubuntu/badge.svg)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) ![CI-Ubuntu](https://github.com/nennigb/EasterEig/workflows/CI-Ubuntu/badge.svg) [![pypi release](https://img.shields.io/pypi/v/eastereig.svg)](https://pypi.org/project/eastereig/)
 
 Consider a parametric eigenvalue problem depending on a parameter \(\nu\). This arises for instance in
 
@@ -46,7 +46,7 @@ Basic workflow and class hierarchy
   1. **OP class**, defines operators of your problem
   2. **Eig class**, handles eigenvalues, their derivatives and reconstruction
   3. **EP class**, combines Eig object to locate EP and compute Puiseux series
-  4. **Loci class**, allows easy Riemann surface plotting
+  4. **Loci class**, stores numerical value of eigenvalues loci and allows easy Riemann surface plotting
 
 Dependencies
 -------------
