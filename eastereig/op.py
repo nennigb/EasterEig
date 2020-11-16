@@ -19,11 +19,11 @@
 r"""
 ##Define the OP class
 
-To locate EP or to reconstruct the eigenvalue loci, high order derivatives of 
-the eigenvalue are required. These derivatives \(\lambda^(n)\) are used 
+To locate EP or to reconstruct the eigenvalue loci, high order derivatives of
+the eigenvalue are required. These derivatives \(\lambda^(n)\) are used
 in the `class EP` to create analytic functions g and h.
 
-In practice, derivatives of the selected pair of eigenvalues can be recursively 
+In practice, derivatives of the selected pair of eigenvalues can be recursively
 computed by solving the bordered matrix [Andrew:1993]
 $$\begin{bmatrix}
 \mathbf{L} & \partial_\lambda \mathbf{L} \mathbf{x} \\
@@ -36,41 +36,37 @@ $$\begin{bmatrix}
 \mathbf{F}_n\\ 0
 \end{pmatrix},
 $$
-where the right hand side (RHS) vector \(\mathbf{F}_n \) contains terms arising 
-from previous order derivatives. All these terms are obtained automatically thank 
+where the right hand side (RHS) vector \(\mathbf{F}_n \) contains terms arising
+from previous order derivatives. All these terms are obtained automatically thank
 to the splitting between `K`, `dK` and `flda` and the `getRHS` method during its
 call by `Eig` class objects.
 """
-# std lib
-from scipy.special import binom
-import numpy as np
 # ee
 from . import eigSolvers
 from .adapter import adaptVec, adaptMat  # adapter patern to avoid interface missmatch
 from . import lda_func
 from .utils import multinomial_index_coefficients
-from eastereig import  _CONST, _petscHere
+from eastereig import _petscHere
 from abc import ABC, abstractmethod
-
 
 
 # list of available solver
 if _petscHere:
-    _SOLVER_DICT={'petsc':eigSolvers.PetscEigSolver,
-                  'numpy':eigSolvers.NumpyEigSolver,
-                  'scipysp':eigSolvers.ScipySpEigSolver}
+    _SOLVER_DICT = {'petsc': eigSolvers.PetscEigSolver,
+                    'numpy': eigSolvers.NumpyEigSolver,
+                    'scipysp': eigSolvers.ScipySpEigSolver}
 else:
-    _SOLVER_DICT={'numpy':eigSolvers.NumpyEigSolver,
-                  'scipysp':eigSolvers.ScipySpEigSolver}
+    _SOLVER_DICT = {'numpy': eigSolvers.NumpyEigSolver,
+                    'scipysp': eigSolvers.ScipySpEigSolver}
 
 
 # Abstract class, not instanciable
-#TODO add a check function before solver
+# TODO add a check function before solver
 class OP(ABC):
     """
-    The OP class define the operator of the problem. This is an abstract class 
+    The OP class define the operator of the problem. This is an abstract class
     and you need to subclass it to describe your own problem.
-    
+
     The following attribute **must** be defined in your subclass (see the examples)
 
     Attributes
@@ -85,7 +81,7 @@ class OP(ABC):
     """
 
     SOLVER_DICT = _SOLVER_DICT
-    """ list of available solver. Such solver are define in eigSolver class    
+    """ list of available solver. Such solver are define in eigSolver class
     """
 
     def __init__(self):
@@ -93,194 +89,187 @@ class OP(ABC):
         init method
         """
 
-    def setnu0(self,nu0):
+    def setnu0(self, nu0):
         """
         Set the nominal value of the parameter [mandatory]
         """
         self.nu0 = nu0
 
 
-    def createL(self,lda):
+    def createL(self, lda):
         """
-        Create operator L matrix at a fixed Lambda from K and flda**(0) 
+        Create operator L matrix at a fixed Lambda from K and flda**(0)
 
         Parameter
         ---------
         lda : complex
             the eigenvalue
-        
+
         Returns
         --------
         L : matrix
             operator evaluation @(lda,nu0)
         """
-        #self.K=self._ImpMat() # work if we recompute K.... but why ?
-        # loop over opertor matrix             
-        for i,Ki in enumerate(self.K):    
+        # self.K=self._ImpMat() # work if we recompute K.... but why ?
+        # loop over opertor matrix
+        for i, Ki in enumerate(self.K):
             flda_ = self.flda[i]
-            if i==0:
+            if i == 0:
                 # need to initialise L, need copy ! L is a Matrix not an adapter because of copy
                 # L need to be complex since lda are generally complex in non-hermitian case
-                #fixme crash is Ki is real and lda complex
+                # fixme crash is Ki is real and lda complex
                 if flda_ is None:
-                    L = adaptMat(Ki,self._lib).copy() 
+                    L = adaptMat(Ki, self._lib).copy()
                 else:
-                    L = adaptMat(Ki,self._lib).copy() * flda_(0,0,[lda]) # list expected
+                    L = adaptMat(Ki, self._lib).copy() * flda_(0, 0, [lda])  # list expected
             else:
                 if flda_ is None:
                     L += Ki
                 else:
-                    L += Ki * flda_(0,0,[lda]) # list expected
-        # store results             
+                    L += Ki * flda_(0, 0, [lda])  # list expected
+        # store results
         return L
-    
-   
 
+    def createDL_ldax(self, vp):
+        r"""
+        Create Vector L1x for the bordered matrix. This vector is \(\partial_\lambda L x\)
+        computed at nu0.
 
-    def createDL_ldax(self,vp):
-        """
-        Create Vector L1x for the bordered matrix. This vector is \(\partial_\lambda L x\) computed at nu0
-        
         The derivative with respect to lda is computed using using K, flda and dlda_flda
-        
+
         Parameters
         -----------
         vp : Eig
             the eigenvalue object
-        
+
         Returns
         --------
         L1x : vector
-            \( \partial_\lambda L x \) computed at (nu0,lda)
+            \( \partial_\lambda L x \) computed at (nu0, lda)
         """
         # init L1x_
-        lda= vp.lda        
-        x= adaptVec(vp.x,self._lib)
-        L1x= adaptVec(x.duplicate(),self._lib) 
-        L1x.set(0.)   
-        
-        # loop over opertor matrices             
-        for i,Ki in enumerate(self.K):    
-            dflda = lda_func._dlda_flda[self.flda[i]](lda)            
-            if dflda != 0:  
-                # matrix operation with the adapter return a real matrix or vector type                             
-                L1x.obj += adaptMat(Ki,self._lib).dot(  x.dot( dflda ) )
-                
-        # store results       
+        lda = vp.lda
+        x = adaptVec(vp.x, self._lib)
+        L1x = adaptVec(x.duplicate(), self._lib)
+        L1x.set(0.)
+
+        # loop over opertor matrices
+        for i, Ki in enumerate(self.K):
+            dflda = lda_func._dlda_flda[self.flda[i]](lda)
+            if dflda != 0:
+                # matrix operation with the adapter return a real matrix or vector type
+                L1x.obj += adaptMat(Ki, self._lib).dot(x.dot(dflda))
+
+        # store results
         return L1x.obj
-        
-    def getRHS(self,vp,n):
-        """
-        Get (compute) RHS vector value use in the Andrew, Chu, Lancaster method.
+
+    def getRHS(self, vp, n):
+        """Compute RHS vector as defined in the Andrew, Chu, Lancaster method.
+
         Function of L, D and derivative of eigenvalue and eigenvector
         La fonction dépend surement de nu, L, D et des dérivées des vp et VP
         RHS must be coherent with the chosed solver (scipy, petsc)
-        
 
-        Symbolic computation of the RHS for polynomial and generalized polynomial eigenvalue problem
-        
+
+        Symbolic computation of the RHS for polynomial and generalized polynomial eigenvalue
+        problem :
+
         [K_0 + f_1(lda)*K_1 + ... + + f_n(lda)*K_n ]x=0
-        
+
         [K_0 + lda*K_1 + ... + + lda**n * K_n ]x=0
-        
+
         The operator should be described by 3 lists
         K=[K0,K1,K2] that contains the operator matrix
         dK=[dK0,dK1,dK2] that contains the derivatives of operator matrix
-        flda = [None, lin, quad] that contains the function of the eigenvalue. The function will return their nth derivatives
-        for general dependancy Faa di Bruno foruma should be used.
+        flda = [None, lin, quad] that contains the function of the eigenvalue. The function will
+        return their nth derivatives for general dependancy Faa di Bruno foruma should be used.
 
         Parameters
-        ---------
+        ----------
         vp : Eig
             the eigenvalue object
-        
+
         Returns
         -------
         F.obj : vector (petsc,numpy,scipy)
             the RHS vector is the good format
         """
-        # use adapter !            
+        # use adapter !
         lib = self._lib
         # adapt the class interface to be independant of the library
-        x= adaptVec(vp.x,self._lib)
+        x = adaptVec(vp.x, self._lib)
 
         # init
-        F= adaptVec(x.duplicate(),lib) # RHS same shape as eigenvector
-        F.set(0.)       
-                
+        F = adaptVec(x.duplicate(), lib)  # RHS same shape as eigenvector
+        F.set(0.)
+
         # number of terms, usually 3 (K_i * f_i(lda) * xi), sometimes 2
-        NTERM = 3          
+        NTERM = 3
         # tuple to remove, because not in the RHS
         #        (Matrix, eigenvector, eigenvalue)
         # Remarks : the lda**(n) are remove in the lda_func
-        skip2 = {(0,n)} # K_0**(0) x**(n)
-        skip3 = {(0,n,0)} # K_1**(0) x**(n) dla**(0)
-                
-        # init matrix derivative index at previous step, to force 1st computation
-        m0old=-1
+        skip2 = {(0, n)}     # K_0**(0) x**(n)
+        skip3 = {(0, n, 0)}  # K_1**(0) x**(n) dla**(0)
+
+        # Init matrix derivative index at previous step, to force 1st computation
+        m0old = -1
         # loop over operator matrices
-        for (Kid,K) in enumerate(self.K):
+        for (Kid, K) in enumerate(self.K):
             # TODO caching the matrix
             # How many terms for liebnitz 2 or 3
-            if self.flda[Kid]==None:
-                ntermi=NTERM-1 # 2
-                skip_set = skip2                
+            if self.flda[Kid] is None:
+                ntermi = NTERM - 1  # 2
+                skip_set = skip2
             else:
-                ntermi=NTERM # 3
+                ntermi = NTERM  # 3
                 skip_set = skip3
-                
-            # multinomial index
-            mind,mcoef=multinomial_index_coefficients(ntermi, n)
-            # on va aussi avoir besoin des coef!
-            for (mi,m) in enumerate(mind):                
+
+            # multinomial index and coef
+            mind, mcoef = multinomial_index_coefficients(ntermi, n)
+            for (mi, m) in enumerate(mind):
                 # check if index belong to RHS
-                if (m not in skip_set):  
-                    """ computing the operator derivative may be long, the matrix is cached 
+                if (m not in skip_set):
+                    """ computing the operator derivative may be long, the matrix is cached
                     until its derivation order change
                     """
-                    if m[0]!=m0old:
+                    if m[0] != m0old:
                         # if matrix order derivative has changed since last computation, compute it
                         dK_m0_ = self.dK[Kid](m[0])
                     if dK_m0_ is not int(0):
                         # if matrix derivative do not vanish...
-                        dK_m0 = adaptMat(dK_m0_,lib) # FIXME may be 0
+                        dK_m0 = adaptMat(dK_m0_, lib)  # FIXME may be 0
                         dx_m1 = adaptVec(vp.dx[m[1]], lib)       # normaly never 0
                         # compute the eigenvalue m[2]-th derivative, return 0 if skiped
                         if ntermi == 2:
-                            F.obj -=  dK_m0.dot( dx_m1.dot(mcoef[mi]))                            
-                        else:      
+                            F.obj -= dK_m0.dot(dx_m1.dot(mcoef[mi]))
+                        else:
                             # filter if lda**(n) or d_lda L lda**(n) because not in RHS
-                            dlda_m = self.flda[Kid](m[2],n,vp.dlda)                        
+                            dlda_m = self.flda[Kid](m[2], n, vp.dlda)
                             if abs(dlda_m) != 0:
-                                F.obj -= dK_m0.dot( dx_m1.dot( dlda_m*mcoef[mi] ) )
-                m0old=m[0]
-                            
-                   
-        return F.obj  
-    
-    def createSolver(self,pb_type='gen',opts=None):
-        """ Factory function that create a eigSolver object. Computation are 
-        delegated to the object define in `SOLVER_DICT`
+                                F.obj -= dK_m0.dot(dx_m1.dot(dlda_m*mcoef[mi]))
+                m0old = m[0]
+
+        return F.obj
+
+    def createSolver(self, pb_type='gen', opts=None):
+        """ Factory function that create a eigSolver object. Computation are
+        delegated to the object define in `SOLVER_DICT`.
 
         Parameters
         -----------
         pb_type : string
-            define the type of eigenvalue problem in \n             
-              - 'std': K[0] X = lda X 
+            define the type of eigenvalue problem in \n
+              - 'std': K[0] X = lda X
               - 'gen' : (K[0]  + lda K[1]) X =0
-              - 'PEP' : (K[0] + K[1] +lda**2 K[2] ) X= 0 
+              - 'PEP' : (K[0] + K[1] +lda**2 K[2] ) X= 0
         opts : not used now
-        
+
         Returns
         -------
         solver : EigSolver object
             the computation should be realize with the solver interface
-                
-        """                   
-        lib=self._lib
-        # create solver
-        self.solver = OP.SOLVER_DICT[lib](self.K,pb_type)  
-        
 
-        
- 
+        """
+        lib = self._lib
+        # create solver
+        self.solver = OP.SOLVER_DICT[lib](self.K, pb_type)
