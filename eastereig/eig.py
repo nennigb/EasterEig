@@ -36,6 +36,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import scipy as sp
 import time
+import itertools as it
 
 from eastereig import _petscHere, gopts, _CONST
 from eastereig.utils import pade
@@ -681,7 +682,72 @@ class NumpyEig(AbstractEig):
             self.dx.append(u.copy()[:-1])
             # print(n, ' ')
 
-        # print('\n')
+    def getDerivativesMV(self, N, op):
+            """ Compute the successive derivative of an eigenvalue of an OP instance
+    
+            Parameters
+            -----------
+            N: tuple of int
+                the number derivative to compute
+            op: OPmv
+                the operator OP instance that describe the eigenvalue problem
+    
+            RHS derivative must start at n=1 for 1st derivatives
+            """
+    
+            # get nu0 value where the derivative are computed
+            self.nu0 = op.nu0
+            # construction de la matrice de l'opérateur L, ie L.L
+            L = op.createL(self.lda)
+            # normalization condition (push elsewhere : différente méthode, indépendace vs type )
+            # must be done before L1x
+            v = np.ones(shape=self.x.shape)
+            # see also VecScale
+            self.x *= (1/v.dot(self.x))
+            # Create an empty array of object
+            self.dx = np.empty(N, dtype=object)
+            self.dx.flat[0] = self.x
+            # Create an zeros array for dlda
+            self.dlda = np.zeros(N, dtype=np.complex)
+            self.dlda.flat[0] = self.lda
+    
+            # constrution du vecteur (\partial_\lambda L)x, ie L.L1x
+            L1x = op.createDL_ldax(self)
+    
+            # bordered
+            # ---------------------------------------------------------------------
+            # Same matrix to factorize for all RHS
+            Zer = np.zeros(shape=(1, 1), dtype=np.complex)
+            Zerv = np.zeros(shape=(1,), dtype=np.complex)
+            Bord = sp.bmat([[L               , L1x.reshape(-1, 1)],
+                            [v.reshape(1, -1), Zer]])  # reshape is to avoid (n,) in bmat
+    
+            # if N > 1 loop for higher order terms
+            print('> Linear solve...')
+            # n is the deriviative multi-index (tuple)
+            for n in it.product(*map(range, N)):
+                # Except for (0, ..., 0)
+                if n != (0,)*len(N):
+                    # compute RHS
+                    tic = time.time()  # init timer
+                    Ftemp = op.getRHS(self, n)
+                    # F= sp.bmat([Ftemp, Zerv]).reshape(-1,1)
+                    F = np.concatenate((Ftemp, Zerv))
+                    # print("              # getRHS real time :", time.time()-tic)
+        
+                    tic = time.time()  # init timer
+                    if sum(n) == 1:
+                        # compute the lu factor
+                        lu, piv = sp.linalg.lu_factor(Bord)
+                    # Forward and back substitution, u contains [dx, dlda])
+                    u = sp.linalg.lu_solve((lu, piv), F)
+                    # print("              # solve LU real time :", time.time()-tic)
+        
+                    # get lda^(n)
+                    derivee = u[-1]
+                    # store the value
+                    self.dlda[n] = derivee
+                    self.dx[n] = u.copy()[:-1]
 
 # end class NumpyEig
 
