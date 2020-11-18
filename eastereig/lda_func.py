@@ -41,7 +41,7 @@ def Lda(k, n, dlda):
     """
     Compute the k-th derivative of lda(nu) with respect to nu.
 
-    **If k==n, the terms containing lda^(n) are skiped**. They dont belong
+    **If k==n, the terms containing lda^(n) are skipped**. They dont belong
     to the RHS computation
 
     Parameters
@@ -55,9 +55,10 @@ def Lda(k, n, dlda):
 
     """
     # k=0 nothing to du just return dlda[0]
-    if k == 0:
+    # to tackle mv modify with sum(k)
+    if np.sum(k) == 0:
         return dlda[0]
-    # by convention this terms is skip (do not belong to RHS)
+    # by convention this terms is skipped (do not belong to RHS)
     if k == n:
         return 0
     # the other are computed, and depend of the function
@@ -76,7 +77,7 @@ def Lda2(k, n, dlda):
     """ Compute the k-th derivative of  (lda(nu)**2) ie (lda(nu)**2)**(k) with respect to nu
     based on liebnitz-rule, see arxiv.org/abs/1909.11579 Eq. 38.
 
-    **If k==n, the terms containing lda^(n) are skiped**. They dont belong to the RHS computation
+    **If k==n, the terms containing lda^(n) are skipped**. They dont belong to the RHS computation
 
     Parameters
     -----------
