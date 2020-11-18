@@ -15,34 +15,46 @@
 
 # You should have received a copy of the GNU General Public License
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
-"""
-Contains helping functions (combinatoric, ...)
+
+""" Contains helper functions (combinatoric, ...)
 """
 import numpy as np
 from numpy import zeros, asarray, eye, poly1d, hstack, r_
 from scipy import linalg
+import itertools  as it
 
 def multinomial_index_coefficients(m, n):
     r"""Return a tuple containing pairs ``((k1,k2,..,km) , C_kn)``
     where ``C_kn`` are multinomial coefficients such that
     ``n=k1+k2+..+km``.
-    
-    Adapted from sympy sympy/ntheory/multinomial.py to return sorted index (speed up) 
+
+    (x_1 + ... + x_m)**n
+
+    Adapted from sympy sympy/ntheory/multinomial.py to return sorted index (speed up)
     to be sure that the first index is changing slowly
+
+    Parameters:
+    -----------
+    m : int
+        Number of variable
+    n: int
+        Power
 
     Returns
     --------
-        mindex : 
-        mcoef :
-    
+    mindex : list
+        Containing all tuple (k1,k2,..,km).
+    mcoef : list
+        Containing all coefficients.
+
     Examples
-    --------    
-    >>> mindex, mcoef = multinomial_index_coefficients(2, 5) 
+    --------
+    >>> mindex, mcoef = multinomial_index_coefficients(2, 5)
     >>> mindex
     [(0, 5), (1, 4), (2, 3), (3, 2), (4, 1), (5, 0)]
     >>> mcoef
     [1, 5, 10, 10, 5, 1]
-    
+
     Notes
     -----
     The algorithm is based on the following result:
@@ -51,7 +63,7 @@ def multinomial_index_coefficients(m, n):
         \frac{k_1 + 1}{n - k_1} \sum_{i=2}^m \binom{n}{k_1 + 1, \ldots, k_i - 1, \ldots}
     Code contributed to Sage by Yann Laigle-Chapuy, copied with permission
     of the author.
-    
+
     """
     m = int(m)
     n = int(n)
@@ -59,11 +71,11 @@ def multinomial_index_coefficients(m, n):
         if n:
             return {}
         return {(): 1}
-# FIXME check bounds !
-#    if m == 2:
-#        return binomial_coefficients(n)
-#    if m >= 2*n and n > 1:
-#        return dict(multinomial_coefficients_iterator(m, n))
+    # FIXME check bounds !
+    #    if m == 2:
+    #        return binomial_coefficients(n)
+    #    if m >= 2*n and n > 1:
+    #        return dict(multinomial_coefficients_iterator(m, n))
     t = [n] + [0] * (m - 1)
     r = {tuple(t): 1}
     if n:
@@ -102,13 +114,71 @@ def multinomial_index_coefficients(m, n):
     return (mindex, mcoef)
 
 
+def multinomial_multiindex_coefficients(m, N):
+    """ Compute the multinomial coefficients and indexes for multi-index.
+
+    In multivariable Liebnitz formula to compute the derivatives as
+    in (f*g*h)(x, y)^(N), where N is a tuple containing the order of derivation for each variable.
+
+    It returns 2 lists that contains :
+      - sublist with derivation order for all functions for all variable,
+        for 2 functions f ang :
+        [[(0, 0), (3, 5)], [(0, 1), (3, 4)],...]
+        means [(df/dx0, dfdy0), (dg/dx3, dgdy5)], [(df/dx0, dfdy1), (dg/dx3, dgdy4)], ... ]
+      - The product of the multinomial coefficients.
+
+    Parameters:
+    -----------
+    m : integer
+        Number of functions (same for all function)
+    N: tuple
+        contains the integer (Power, derivative order) for all variables.
+
+    Returns
+    --------
+    multi_multi_index : list
+        Containing all tuple (n1, n1, .., nm).
+    multi_multi_coef : list
+        Containing all coefficients.
+
+    Examples
+    --------
+    This example has been tested with sympy
+    >>> mindex, mcoef = multinomial_multiindex_coefficients(2, (2, 3))
+    >>> mindex
+    [[(0, 0), (2, 3)], [(0, 1), (2, 2)], [(0, 2), (2, 1)], [(0, 3), (2, 0)], [(1, 0), (1, 3)], \
+[(1, 1), (1, 2)], [(1, 2), (1, 1)], [(1, 3), (1, 0)], [(2, 0), (0, 3)], [(2, 1), (0, 2)], \
+[(2, 2), (0, 1)], [(2, 3), (0, 0)]]
+    >>> mcoef
+    [1, 3, 3, 1, 2, 6, 6, 2, 1, 3, 3, 1]
+    """
+    # Create the multinomial index/coef for each variable
+    mindex, mcoef = [], []
+    for n in N:
+        mindex_, mcoef_ = multinomial_index_coefficients(m, n)
+        mindex.append(mindex_)
+        mcoef.append(mcoef_)
+
+    # Create the gloabl index/coef
+    multi_multi_index = []
+    multi_multi_coef = []
+    for mmindexi, mmcoefi in zip(it.product(*mindex),
+                                 it.product(*mcoef)):
+        # gloabl coef are the product of each coefs
+        multi_multi_coef.append(np.prod(mmcoefi))
+        # rearrange data structure to regroup them by function
+        multi_multi_index.append([pair for pair in zip(*mmindexi)])
+
+    return (multi_multi_index, multi_multi_coef)
+
+
 def sortdict(adict):
     """
     Return a list the sorted keys and the associated list of value
     """
     keys = adict.keys()
     sorted_keys = sorted(keys)
-    return sorted_keys,[adict[key] for key in sorted_keys]
+    return sorted_keys, [adict[key] for key in sorted_keys]
 
 
 def pade(an, m, n=None):
