@@ -31,11 +31,20 @@ We would like to find the EP3.
 @author: bn
 """
 
-import networkx as nx
 import numpy as np
 import eastereig as ee
 import matplotlib.pyplot as plt
 from bruteforce import bruteForceSolvePar
+import itertools as it
+import concurrent.futures
+from functools import partial
+
+try:
+    import sympy as sym
+    sym.init_printing(forecolor='White')
+except ImportError():
+    print('sympy is needed for testing')
+
 
 class Network(ee.OPmv):
     """Create a subclass of the interface class OP that describe the problem
@@ -153,6 +162,67 @@ class Network(ee.OPmv):
         else:
             return 0
 
+def _inner(l, N, var, nu, mu):
+    """ Inner loop for sympy_check. Usefull for // computation.
+    """
+    dlda = np.zeros(N, dtype=np.complex)
+    for n in it.product(*map(range, N)):
+        print(n)
+        dlda[n] = sym.N(sym.diff(l, mu, n[0], nu, n[1]).subs(var))
+    return dlda
+
+def sympy_check(nu0, sympyfile):
+    """ Check multiple derivatives with sympy.
+    
+    Parameters
+    ----------
+    n0 : tuple
+        Contains the nominal value of mu and nu.
+    sympyfile : string
+        filename for saving sympy output.
+
+    Returns
+    -------
+    dlda : list
+        Contains the sucessive derivative with respect to mu (row) and
+        nu (column) as np.array
+
+    """
+    # set max // workers
+    max_workers = 3
+    # derivatives order
+    N = (5, 5)
+    # FIXME hard coded parameters
+    m = 1.
+    k = 1.
+    mu, nu, lda = sym.symbols('mu, nu, lambda', complex=True)
+    var = {mu: nu0[0], nu: nu0[1]}
+    M = - sym.Matrix([[m, 0, 0],
+                      [0, m, 0],
+                      [0, 0, m]])
+    K = sym.Matrix([[mu+k, -k, 0.],
+                    [-k, 2*k, -k],
+                    [0., -k, nu+k]])
+    # Symbols
+    p0 = sym.det(K - lda*M)
+    p1 = sym.diff(p0, lda)
+    p2 = sym.diff(p1, lda)
+    # solve for lda
+    ldas = sym.solve(p0, lda)
+    dlda = dict()
+    print('May take a while...')
+
+    # use partial to fixed all function parameters except lda
+    _inner_lda = partial(_inner, N=N, var=var, nu=nu, mu=mu)
+    # run the // computation
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        for i, dlda_ in enumerate(executor.map(_inner_lda, ldas)):
+            dlda[i] = dlda_
+
+    np.savez(sympyfile, dlda=dlda)
+
+    return dlda
+
 
 # %% MAIN
 if __name__ == '__main__':
@@ -161,9 +231,13 @@ if __name__ == '__main__':
     from multiple import *
     from scipy.special import factorial
 
+    np.set_printoptions(linewidth=150)
     Nderiv = (5, 5)
     # tuple of the inital param
     nu0 = (1., 1)
+    # Sympy check parameters
+    sym_check = False
+    sympyfile =  'sympy_dlda'
 
     # %% Locate EP
     net = Network(nu0)
@@ -192,3 +266,28 @@ if __name__ == '__main__':
     #     dLambda.append(np.array(vp.dlda))
     #     if export:
     #         vp.export(name + '_vp_' + str(i), eigenvec=False)
+    # %% Check with sympy
+    if sym_check:
+        dlda_ref = sympy_check(nu0, sympyfile)
+        """
+        dlda_ref[0].real
+        array([[-3.41421356, -0.25      , -0.22097087, -0.1875    , -0.02900243],
+               [-0.25      ,  0.13258252,  0.0625    , -0.06214806, -0.28125   ],
+               [-0.22097087,  0.0625    ,  0.10358009,  0.09375   , -0.22204983],
+               [-0.1875    , -0.06214806,  0.09375   ,  0.39425174,  0.5625    ],
+               [-0.02900243, -0.28125   , -0.22204983,  0.5625    ,  3.47561795]])
+
+    dlda_ref[1].real
+        array([[-0.58578644, -0.25      ,  0.22097087, -0.1875    ,  0.02900243],
+               [-0.25      , -0.13258252,  0.0625    ,  0.06214806, -0.28125   ],
+               [ 0.22097087,  0.0625    , -0.10358009,  0.09375   ,  0.22204983],
+               [-0.1875    ,  0.06214806,  0.09375   , -0.39425174,  0.5625    ],
+               [ 0.02900243, -0.28125   ,  0.22204983,  0.5625    , -3.47561795]])
+
+    dlda_ref[2].real
+        array([[-2.00000000e+00, -5.00000000e-01, -8.39220777e-18,  3.75000000e-01,  7.55586683e-18],
+               [-5.00000000e-01,  4.02810988e-18, -1.25000000e-01,  8.51605573e-18,  5.62500000e-01],
+               [-8.39220777e-18, -1.25000000e-01,  3.71511123e-18, -1.87500000e-01,  7.77698184e-18],
+               [ 3.75000000e-01,  1.80035419e-18, -1.87500000e-01,  6.16975297e-17, -1.12500000e+00],
+               [ 7.55586683e-18,  5.62500000e-01, -3.48957050e-17, -1.12500000e+00, -7.23310784e-16]])
+        """
