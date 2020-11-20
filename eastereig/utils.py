@@ -16,12 +16,14 @@
 # You should have received a copy of the GNU General Public License
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
 
-""" Contains helper functions (combinatoric, ...)
+""" Contains helper functions (combinatoric, derivation, ...)
 """
 import numpy as np
 from numpy import zeros, asarray, eye, poly1d, hstack, r_
 from scipy import linalg
 import itertools  as it
+from collections import deque
+
 
 def multinomial_index_coefficients(m, n):
     r"""Return a tuple containing pairs ``((k1,k2,..,km) , C_kn)``
@@ -117,12 +119,13 @@ def multinomial_index_coefficients(m, n):
 def multinomial_multiindex_coefficients(m, N):
     """ Compute the multinomial coefficients and indexes for multi-index.
 
-    In multivariable Liebnitz formula to compute the derivatives as
-    in (f*g*h)(x, y)^(N), where N is a tuple containing the order of derivation for each variable.
+    It appear in multivariable Liebnitz formula to compute derivatives like
+    in (f*g*h)(x, y)^(N), where N is a tuple containing the order of derivation
+    for each variable ('x' and 'y' here).
 
     It returns 2 lists that contains :
-      - sublist with derivation order for all functions for all variable,
-        for 2 functions f ang :
+      - sublist with derivation order for all functions, for all variables,
+        for instance, with 2 functions f and g such (f*g)(x, y)^(2, 3)
         [[(0, 0), (3, 5)], [(0, 1), (3, 4)],...]
         means [(df/dx0, dfdy0), (dg/dx3, dgdy5)], [(df/dx0, dfdy1), (dg/dx3, dgdy4)], ... ]
       - The product of the multinomial coefficients.
@@ -130,20 +133,20 @@ def multinomial_multiindex_coefficients(m, N):
     Parameters:
     -----------
     m : integer
-        Number of functions (same for all function)
+        Number of functions.
     N: tuple
-        contains the integer (Power, derivative order) for all variables.
+        Contains the integer (derivative order) for all variables.
 
     Returns
     --------
     multi_multi_index : list
-        Containing all tuple (n1, n1, .., nm).
+        Containing all tuple (n1, n1, .., n_m).
     multi_multi_coef : list
-        Containing all coefficients.
+        Containing the product of the multinomial coefficients.
 
     Examples
     --------
-    This example has been tested with sympy
+    This example has been tested with sympy (see 'tests' folder).
     >>> mindex, mcoef = multinomial_multiindex_coefficients(2, (2, 3))
     >>> mindex
     [[(0, 0), (2, 3)], [(0, 1), (2, 2)], [(0, 2), (2, 1)], [(0, 3), (2, 0)], [(1, 0), (1, 3)], \
@@ -173,12 +176,133 @@ def multinomial_multiindex_coefficients(m, N):
 
 
 def sortdict(adict):
-    """
-    Return a list the sorted keys and the associated list of value
+    """ Return a list the sorted keys and the associated list of value.
     """
     keys = adict.keys()
     sorted_keys = sorted(keys)
     return sorted_keys, [adict[key] for key in sorted_keys]
+
+
+def diffprod(dh, N):
+    r"""Compute the n-th derivative of a product of function hi knowing the hi**(k).
+    depending on a single variable.
+
+    For instance, if H(x) = h0*h1*h2*...*h_(M-1) we want to compute
+    H**(n) = (h0*h1*h2*...)**(n) with n<N
+
+    This function use the generalized Liebnitz rule.
+
+    Parameters
+    ----------
+    dh : list
+        list of derivatives of all fi. The lenth of dh is M. Each element of dh
+        contains the successive derivative of hi.
+    N : int
+        Number of requested derivatives
+
+    Returns
+    --------
+    DH : list
+        Contains the successive derivative of H. It is noteworthy that factorial
+        are not included. DH is not a Taylor series.
+
+    Exemples
+    --------
+    # With 2 functions: h0 = x**2, h1 = exp(x) @ x=1
+    >>> dh = [np.array([1, 2*1, 2, 0, 0]), np.exp(1)*np.ones((5,))]
+    >>> dh_ref = np.array([2.71828182845905, 8.15484548537714, 19.0279727992133, 35.3376637699676])
+    >>> d = diffprod(dh, 4)
+    >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
+    True
+
+    # With 3 functions : h0 = x, h1 = exp(x), h2=x @ x=1
+    >>> dh = [np.array([1, 1, 0, 0, 0]), np.exp(1)*np.ones((5,)), np.array([1, 1, 0, 0, 0])]
+    >>> d = diffprod(dh, 4)
+    >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
+    True
+    """
+    # Get the number of functions hi
+    M = len(dh)
+
+    # init DH of all h_i (no derivative)
+    DH = [np.prod([dh[i][0] for i in range(0, M)])]
+    # compute global derivative order n
+    for n in np.arange(1, N):
+        # get multinomial index and coefficients
+        multi, coef = multinomial_index_coefficients(M, n)
+        # liebnitz formula
+        # sum
+        sh = complex(0.)
+        for index, k in enumerate(multi):
+            # coefk = multinom(n,k)
+            coefk = coef[index]
+            # produit
+            ph = complex(1.)
+            for t in np.arange(0, M):
+                ph *= dh[t][k[t]]
+            sh += ph*coefk
+        # store nth derivatibe
+        DH.append(sh)
+
+    # DH contains the successive derivative, no factorial inside !!
+    return DH
+
+
+def diffprodTree(dh, N):
+    r"""Compute the n-th derivative of a product of function hi knowing the hi**(k)
+    depending on a single variable.
+
+    For instance, if H(x) = h0*h1*h2*...*h_(M-1) we want to compute
+    H**(n) = (h0*h1*h2*...)**(n) with n<N
+
+    This function use the generalized Liebnitz rule by pair using a queue.
+    This approch is faster that `diffprod` when the number of function is
+    more than 3.
+
+    Parameters
+    ----------
+    dh : list
+        list of derivatives of all fi. The lenth of dh is M. Each element of dh
+        contains the successive derivative of hi.
+    N : int
+        Number of requested derivatives
+
+    Returns
+    --------
+    DH : list
+        Contains the successive derivative of H. It is noteworthy that factorial
+        are not included. DH is not a Taylor series.
+
+    Exemples
+    --------
+    # With 2 functions: h0 = x**2, h1 = exp(x) @ x=1
+    >>> dh = [np.array([1, 2*1, 2, 0, 0]), np.exp(1)*np.ones((5,))]
+    >>> dh_ref = np.array([2.71828182845905, 8.15484548537714, 19.0279727992133, 35.3376637699676])
+    >>> d = diffprodTree(dh, 4)
+    >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
+    True
+
+    # With 3 functions : h0 = x, h1 = exp(x), h2=x @ x=1
+    >>> dh = [np.array([1, 1, 0, 0, 0]), np.exp(1)*np.ones((5,)), np.array([1, 1, 0, 0, 0])]
+    >>> d = diffprodTree(dh, 4)
+    >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
+    True
+    """
+    # create a queue to be consumed
+    lda_list = deque(range(0, len(dh)))
+    # create a dictionnary containing all the derivatives of the tree
+    deriv = dict(zip(lda_list, dh))
+
+    # consume the queue by computing derivative of successive pairs
+    while len(lda_list) > 1:
+        # get the pair
+        pair = (lda_list.popleft(), lda_list.popleft())
+        lda_list.append(pair)
+        # store the results in the dict
+        deriv[pair] = diffprod((deriv[pair[0]], deriv[pair[1]]), N)
+
+    # return the final derivative
+    return deriv[lda_list[0]]
 
 
 def pade(an, m, n=None):
