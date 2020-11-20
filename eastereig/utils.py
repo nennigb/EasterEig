@@ -252,7 +252,7 @@ def diffprod(dh, N):
 def diffprodMV(dh, N):
     r"""Compute the n-th derivative of a product of function hi knowing the
     hi**(k), depending on a single variable (if N is an int) or of multiple
-    variable (N is a tuple).
+    variables (N is a tuple).
 
     For instance, if H(x) = h0*h1*h2*...*h_(M-1) we want to compute
     H**(n) = (h0*h1*h2*...)**(n) with n<N
@@ -263,7 +263,7 @@ def diffprodMV(dh, N):
     ----------
     dh : list
         ndarray of derivatives of all hi. The lenth of dh is M. Each element of dh
-        contains the successive derivative of hi.
+        contains the successive derivative of hi in a ndarray.
     N : int or tuple
         Number of requested derivatives. For uni-varaite case, N must be an integader,
         for the multi-variate case, N must be tuple containing the derivation order
@@ -334,45 +334,50 @@ def diffprodMV(dh, N):
 
 
 def diffprodTree(dh, N):
-    r"""Compute the n-th derivative of a product of function hi knowing the hi**(k)
-    depending on a single variable.
+    r"""Compute the n-th derivative of a product of function hi knowing the
+    hi**(k), depending on a single variable (if N is an int) or of multiple
+    variables (N is a tuple).
 
     For instance, if H(x) = h0*h1*h2*...*h_(M-1) we want to compute
     H**(n) = (h0*h1*h2*...)**(n) with n<N
 
     This function use the generalized Liebnitz rule by pair using a queue.
-    This approch is faster that `diffprod` when the number of function is
+    This approach is faster that `diffprod` when the number of function is
     more than 3.
 
     Parameters
     ----------
     dh : list
-        list of derivatives of all hi. The lenth of dh is M. Each element of dh
-        contains the successive derivative of hi.
-    N : int
-        Number of requested derivatives
+        ndarray of derivatives of all hi. The lenth of dh is M. Each element of dh
+        contains the successive derivative of hi in a ndarray.
+    N : int or tuple
+        Number of requested derivatives. For uni-varaite case, N must be an integader,
+        for the multi-variate case, N must be tuple containing the derivation order
+        for each variable.
 
     Returns
     --------
     DH : list
-        Contains the successive derivative of H. It is noteworthy that factorial
-        are not included. DH is not a Taylor series.
+        Contains the successive derivatives of H with respect to all the variable.
+        The output is ndarray whom dimensions follow N order. It is noteworthy that
+        'factorial' are not included. DH is not a Taylor series.
 
     Exemples
     --------
-    Let us consider a product of 2 function such,
-    H = h0 * h1 with h0 = x**2, h1 = exp(x) @ x=1
+    Multivariate example are available in the 'tests' folder.
+    Let us consider H = h0 * h1 with h0 = x**2, h1 = exp(x) @ x=1
     >>> dh = [np.array([1, 2*1, 2, 0, 0]), np.exp(1)*np.ones((5,))]
     >>> dh_ref = np.array([2.71828182845905, 8.15484548537714, 19.0279727992133, 35.3376637699676])
-    >>> d = diffprodTree(dh, 4)
+    >>> d = diffprod(dh, 4)
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
     True
 
-    # With a product of 3 functions : h0 = x, h1 = exp(x), h2=x @ x=1
+    # With 3 functions : h0 = x, h1 = exp(x), h2=x @ x=1
     >>> dh = [np.array([1, 1, 0, 0, 0]), np.exp(1)*np.ones((5,)), np.array([1, 1, 0, 0, 0])]
-    >>> d = diffprodTree(dh, 4)
+    >>> d = diffprod(dh, 4)
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
     True
+    
     """
     # create a queue to be consumed
     lda_list = deque(range(0, len(dh)))
@@ -385,10 +390,15 @@ def diffprodTree(dh, N):
         pair = (lda_list.popleft(), lda_list.popleft())
         lda_list.append(pair)
         # store the results in the dict
-        deriv[pair] = diffprod((deriv[pair[0]], deriv[pair[1]]), N)
+        # FIXME don't forget to change mane here
+        deriv[pair] = diffprodMV((deriv[pair[0]], deriv[pair[1]]), N)
 
     # return the final derivative
     return deriv[lda_list[0]]
+
+
+# Nothing to do, juste create an alias (just in case)
+diffprodTreeMV = diffprodTree
 
 
 def pade(an, m, n=None):
