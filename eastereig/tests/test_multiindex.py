@@ -53,7 +53,7 @@ class Test_multinomial_multiindex_coefficients(unittest.TestCase):
         # compute reference solution with sympy
         d = sym.diff(f*g, x, N[0], y, N[1])
 
-        # built sympy expression from ee coefs and index
+        # built sympy expressions from ee coefs and index
         d_ = 0
         for i, c in zip(mmi_index, mmi_coef):
             d_ += c * sym.diff(f, x, i[0][0], y, i[0][1]) \
@@ -82,6 +82,41 @@ class Test_multinomial_multiindex_coefficients(unittest.TestCase):
                     * sym.diff(h, x, i[2][0], y, i[2][1])
         # check
         self.assertTrue(d_ == d)
+
+    def test_diffprodMV(self):
+        """ Test the computation derivative of multivariate product of functions.
+
+        example : H = (x*y**2) * exp(x*y) @ x=0.5, y=1.5
+        """
+        tol = 1e-10
+        # derivation order (Cannot be changed here)
+        N = (2, 3)
+        x = 0.5
+        y = 1.5
+
+        dh0 = np.array([[x*y**2, x*2*y, x*2, 0, 0],
+                        [y**2,   2*y,   2,   0, 0],
+                        [0,      0,     0,   0, 0],
+                        [0,      0,     0,   0, 0]])
+        exy = np.exp(x*y)
+        xy = x*y
+
+        dh1 = np.array([[exy,   x * exy, x**2 * exy, x**3 * exy, x**4*exy],
+                        [y*exy, (xy + 1)*exy,  x*(xy + 2)*exy, x**2 * (xy + 3)*exy, x**3*(xy + 4)*exy],
+                        [y**2 * exy, y*(xy + 2)*exy,   (x**2 * y**2 + 4*xy + 2) * exy, x*(x**2 * y**2 + 6*xy + 6) * exy, x**2*(x**2*y**2 + 8*xy + 12)*exy],
+                        [y**3*exy, y**2*(xy + 3)*exy, y*(x**2*y**2 + 6*xy + 6)*exy, (x**3*y**3 + 9*x**2*y**2 + 18*xy + 6)*exy, x*(x**3*y**3 + 12*x**2*y**2 + 36*xy + 24)*exy]])
+        # 'numerical' derivation with ee Liebnitz
+        dH = utils.diffprodMV([dh0, dh1], N)
+
+        # Compute sympy ref solution
+        x_, y_ = sym.symbols('x, y')
+        H_ = (x_*y_**2) * sym.exp(x_*y_)
+        dH_12 = sym.diff(H_, x_, 1, y_, 2)
+        dH_23 = sym.diff(H_, x_, 2, y_, 3)
+
+        # check with sympy
+        self.assertTrue(abs(dH[1, 2] - sym.N(dH_12.subs({x_: x, y_: y}))) < tol)
+        self.assertTrue(abs(dH[2, 3] - sym.N(dH_23.subs({x_: x, y_: y}))) < tol)
 
 
 if __name__ == '__main__':
