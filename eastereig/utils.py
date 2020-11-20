@@ -182,7 +182,7 @@ def sortdict(adict):
     sorted_keys = sorted(keys)
     return sorted_keys, [adict[key] for key in sorted_keys]
 
-
+# TODO : depreciated
 def diffprod(dh, N):
     r"""Compute the n-th derivative of a product of function hi knowing the hi**(k).
     depending on a single variable.
@@ -195,7 +195,7 @@ def diffprod(dh, N):
     Parameters
     ----------
     dh : list
-        list of derivatives of all fi. The lenth of dh is M. Each element of dh
+        list of derivatives of all hi. The lenth of dh is M. Each element of dh
         contains the successive derivative of hi.
     N : int
         Number of requested derivatives
@@ -208,14 +208,15 @@ def diffprod(dh, N):
 
     Exemples
     --------
-    # With 2 functions: h0 = x**2, h1 = exp(x) @ x=1
+    Let us consider a product of 2 function such,
+    H = h0 * h1 with h0 = x**2, h1 = exp(x) @ x=1
     >>> dh = [np.array([1, 2*1, 2, 0, 0]), np.exp(1)*np.ones((5,))]
     >>> dh_ref = np.array([2.71828182845905, 8.15484548537714, 19.0279727992133, 35.3376637699676])
     >>> d = diffprod(dh, 4)
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
     True
 
-    # With 3 functions : h0 = x, h1 = exp(x), h2=x @ x=1
+    # With a product of 3 functions : h0 = x, h1 = exp(x), h2=x @ x=1
     >>> dh = [np.array([1, 1, 0, 0, 0]), np.exp(1)*np.ones((5,)), np.array([1, 1, 0, 0, 0])]
     >>> d = diffprod(dh, 4)
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
@@ -248,6 +249,90 @@ def diffprod(dh, N):
     return DH
 
 
+def diffprodMV(dh, N):
+    r"""Compute the n-th derivative of a product of function hi knowing the
+    hi**(k), depending on a single variable (if N is an int) or of multiple
+    variable (N is a tuple).
+
+    For instance, if H(x) = h0*h1*h2*...*h_(M-1) we want to compute
+    H**(n) = (h0*h1*h2*...)**(n) with n<N
+
+    This function use the generalized Liebnitz rule.
+
+    Parameters
+    ----------
+    dh : list
+        ndarray of derivatives of all hi. The lenth of dh is M. Each element of dh
+        contains the successive derivative of hi.
+    N : int or tuple
+        Number of requested derivatives. For uni-varaite case, N must be an integader,
+        for the multi-variate case, N must be tuple containing the derivation order
+        for each variable.
+
+    Returns
+    --------
+    DH : list
+        Contains the successive derivatives of H with respect to all the variable.
+        The output is ndarray whom dimensions follow N order. It is noteworthy that
+        'factorial' are not included. DH is not a Taylor series.
+
+    Exemples
+    --------
+    Multivariate example are available in the 'tests' folder.
+    Let us consider H = h0 * h1 with h0 = x**2, h1 = exp(x) @ x=1
+    >>> dh = [np.array([1, 2*1, 2, 0, 0]), np.exp(1)*np.ones((5,))]
+    >>> dh_ref = np.array([2.71828182845905, 8.15484548537714, 19.0279727992133, 35.3376637699676])
+    >>> d = diffprod(dh, 4)
+    >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
+    True
+
+    # With 3 functions : h0 = x, h1 = exp(x), h2=x @ x=1
+    >>> dh = [np.array([1, 1, 0, 0, 0]), np.exp(1)*np.ones((5,)), np.array([1, 1, 0, 0, 0])]
+    >>> d = diffprod(dh, 4)
+    >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
+    True
+    
+    """
+    # Get the number of functions hi
+    M = len(dh)
+
+    # Check if single or multivariable using N
+    mv = len(N) != 1
+
+    # init DH of all h_i (no derivative)
+    DH = np.zeros(np.array(N)+1, dtype=np.complex)
+    # Create the generator
+    if mv:
+        # for multivariable case
+        derivative_deg = it.product(*map(range, np.array(N)+1))
+        multinomial = multinomial_multiindex_coefficients
+    else:
+        # for mono variable case
+        derivative_deg = np.arange(1, N)
+        multinomial = multinomial_index_coefficients
+
+    # Compute global derivative order n
+    for n in derivative_deg:
+        # Get multinomial index and coefficients
+        multi, coef = multinomial(M, n)
+        # Liebnitz formula
+        # sum
+        sh = complex(0.)
+        for index, k in enumerate(multi):
+            # coefk = multinom(n,k)
+            coefk = coef[index]
+            # produit
+            ph = complex(1.)
+            for t in np.arange(0, M):
+                ph *= dh[t][k[t]]
+            sh += ph*coefk
+        # store nth derivatibe
+        DH[n] = sh
+
+    # DH contains the successive derivative, no factorial inside !!
+    return DH
+
+
 def diffprodTree(dh, N):
     r"""Compute the n-th derivative of a product of function hi knowing the hi**(k)
     depending on a single variable.
@@ -262,7 +347,7 @@ def diffprodTree(dh, N):
     Parameters
     ----------
     dh : list
-        list of derivatives of all fi. The lenth of dh is M. Each element of dh
+        list of derivatives of all hi. The lenth of dh is M. Each element of dh
         contains the successive derivative of hi.
     N : int
         Number of requested derivatives
@@ -275,14 +360,15 @@ def diffprodTree(dh, N):
 
     Exemples
     --------
-    # With 2 functions: h0 = x**2, h1 = exp(x) @ x=1
+    Let us consider a product of 2 function such,
+    H = h0 * h1 with h0 = x**2, h1 = exp(x) @ x=1
     >>> dh = [np.array([1, 2*1, 2, 0, 0]), np.exp(1)*np.ones((5,))]
     >>> dh_ref = np.array([2.71828182845905, 8.15484548537714, 19.0279727992133, 35.3376637699676])
     >>> d = diffprodTree(dh, 4)
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
     True
 
-    # With 3 functions : h0 = x, h1 = exp(x), h2=x @ x=1
+    # With a product of 3 functions : h0 = x, h1 = exp(x), h2=x @ x=1
     >>> dh = [np.array([1, 1, 0, 0, 0]), np.exp(1)*np.ones((5,)), np.array([1, 1, 0, 0, 0])]
     >>> d = diffprodTree(dh, 4)
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
