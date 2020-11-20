@@ -83,7 +83,7 @@ class Test_multinomial_multiindex_coefficients(unittest.TestCase):
         # check
         self.assertTrue(d_ == d)
 
-    def test_diffprodMV(self):
+    def test_diffprodMV_and_diffprodTreeMV(self):
         """ Test the computation derivative of multivariate product of functions.
 
         example : H = (x*y**2) * exp(x*y) @ x=0.5, y=1.5
@@ -105,8 +105,10 @@ class Test_multinomial_multiindex_coefficients(unittest.TestCase):
                         [y*exy, (xy + 1)*exy,  x*(xy + 2)*exy, x**2 * (xy + 3)*exy, x**3*(xy + 4)*exy],
                         [y**2 * exy, y*(xy + 2)*exy,   (x**2 * y**2 + 4*xy + 2) * exy, x*(x**2 * y**2 + 6*xy + 6) * exy, x**2*(x**2*y**2 + 8*xy + 12)*exy],
                         [y**3*exy, y**2*(xy + 3)*exy, y*(x**2*y**2 + 6*xy + 6)*exy, (x**3*y**3 + 9*x**2*y**2 + 18*xy + 6)*exy, x*(x**3*y**3 + 12*x**2*y**2 + 36*xy + 24)*exy]])
-        # 'numerical' derivation with ee Liebnitz
+        # 'numerical' derivation with ee Liebnitz (standard)
         dH = utils.diffprodMV([dh0, dh1], N)
+        # 'numerical' derivation with ee Liebnitz (optimized)
+        dHt = utils.diffprodTreeMV([dh0, dh1], N)
 
         # Compute sympy ref solution
         x_, y_ = sym.symbols('x, y')
@@ -117,6 +119,8 @@ class Test_multinomial_multiindex_coefficients(unittest.TestCase):
         # check with sympy
         self.assertTrue(abs(dH[1, 2] - sym.N(dH_12.subs({x_: x, y_: y}))) < tol)
         self.assertTrue(abs(dH[2, 3] - sym.N(dH_23.subs({x_: x, y_: y}))) < tol)
+        self.assertTrue(abs(dHt[1, 2] - sym.N(dH_12.subs({x_: x, y_: y}))) < tol)
+        self.assertTrue(abs(dHt[2, 3] - sym.N(dH_23.subs({x_: x, y_: y}))) < tol)
 
 
 if __name__ == '__main__':
