@@ -40,7 +40,7 @@ setup(
     name="eastereig",
     version=this_version,
     author="B. Nennig, M. Ghienne",
-    author_email="benoit.nennig@supmeca.fr, martin.ghienne@supmeca.fr",
+    author_email="benoit.nennig@isae-supmeca.fr, martin.ghienne@isae-supmeca.fr",
     description="A library to locate exceptional points and to reconstruct eigenvalues loci",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -52,6 +52,7 @@ setup(
     ext_modules=ext_modules,
     install_requires=['numpy',
                       'scipy',
+                      'sympy>=1.4',
                       'matplotlib'],
     classifiers=[
         "Programming Language :: Python :: 3",
