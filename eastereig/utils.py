@@ -21,9 +21,10 @@
 import numpy as np
 from numpy import zeros, asarray, eye, poly1d, hstack, r_
 from scipy import linalg
+from scipy.special import factorial
 import itertools  as it
 from collections import deque
-
+from functools import reduce
 
 def multinomial_index_coefficients(m, n):
     r"""Return a tuple containing pairs ``((k1,k2,..,km) , C_kn)``
@@ -282,17 +283,18 @@ def diffprodMV(dh, N):
     Let us consider H = h0 * h1 with h0 = x**2, h1 = exp(x) @ x=1
     >>> dh = [np.array([1, 2*1, 2, 0, 0]), np.exp(1)*np.ones((5,))]
     >>> dh_ref = np.array([2.71828182845905, 8.15484548537714, 19.0279727992133, 35.3376637699676])
-    >>> d = diffprod(dh, 4)
+    >>> d = diffprodMV(dh, (3,))
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
     True
 
     # With 3 functions : h0 = x, h1 = exp(x), h2=x @ x=1
     >>> dh = [np.array([1, 1, 0, 0, 0]), np.exp(1)*np.ones((5,)), np.array([1, 1, 0, 0, 0])]
-    >>> d = diffprod(dh, 4)
+    >>> d = diffprodMV(dh, (3,))
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
     True
     
     """
+    # TODO check type of N
     # Get the number of functions hi
     M = len(dh)
 
@@ -308,7 +310,7 @@ def diffprodMV(dh, N):
         multinomial = multinomial_multiindex_coefficients
     else:
         # for mono variable case
-        derivative_deg = np.arange(1, N)
+        derivative_deg = np.arange(0, N[0]+1)
         multinomial = multinomial_index_coefficients
 
     # Compute global derivative order n
@@ -368,13 +370,13 @@ def diffprodTree(dh, N):
     Let us consider H = h0 * h1 with h0 = x**2, h1 = exp(x) @ x=1
     >>> dh = [np.array([1, 2*1, 2, 0, 0]), np.exp(1)*np.ones((5,))]
     >>> dh_ref = np.array([2.71828182845905, 8.15484548537714, 19.0279727992133, 35.3376637699676])
-    >>> d = diffprod(dh, 4)
+    >>> d = diffprodTree(dh, (3,))
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
     True
 
     # With 3 functions : h0 = x, h1 = exp(x), h2=x @ x=1
     >>> dh = [np.array([1, 1, 0, 0, 0]), np.exp(1)*np.ones((5,)), np.array([1, 1, 0, 0, 0])]
-    >>> d = diffprod(dh, 4)
+    >>> d = diffprodTree(dh, (3,))
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
     True
     
@@ -399,6 +401,39 @@ def diffprodTree(dh, N):
 
 # Nothing to do, juste create an alias (just in case)
 diffprodTreeMV = diffprodTree
+
+def div_factorial(dH):
+    """ Convert Multivariate derivation matrix to Taylor series by dividing
+    by the factorial coeff.
+
+    Parameters
+    ----------
+    dH : ndarray
+        Contains the derivative of H with respect of each variable. 
+        dH[3,2] means up dx**2 dy (H).
+        
+    # TODO chnage into factorial matrix to avoid to recomputed...
+    Returns
+    -------
+    Th : ndarray
+        Taylor series coefficients.
+    """
+    N = dH.shape
+    nmax = max(N)
+    # compute the factorial once.
+    fact = factorial(np.arange(0, nmax))
+    fact_list = [fact[0:ni] for ni in N]
+    D = _outer(*fact_list)
+    Th = dH/D
+    return Th
+
+
+def _outer(*vs):
+    """ Compute the outer product of sequence of vectors.
+
+    https://stackoverflow.com/questions/17138393/numpy-outer-product-of-n-vectors
+    """
+    return np.multiply.reduce(np.ix_(*vs))
 
 
 def pade(an, m, n=None):
@@ -429,7 +464,7 @@ def pade(an, m, n=None):
     adapt to complex
     >>> e_exp = [1.0+0j, 1.0+0.j, (1.0+0.j)/2.0, (1.0+0.j)/6.0, (1.0+0.j)/24.0, (1.0+0.j)/120.0]
     >>> p, q = pade(e_exp, 2)
-    >>> p(1)/q(1)
+    >>> p(1)/q(1)  # doctest: +ELLIPSIS
     (2.7179487179487...+0j)
 
     Compute Taylor exp(1+1j+x) @ x=0
@@ -437,7 +472,7 @@ def pade(an, m, n=None):
                            0.7343469699579426  +1.1436776435894211j, 0.24478232331931418 +0.3812258811964737j, \
                            0.061195580829828546+0.09530647029911843j , 0.01223911616596571 +0.019061294059823684j])
     >>> p, q = pade(e_expc, 2)
-    >>> p(-1j)/q(-1j)
+    >>> p(-1j)/q(-1j)  # doctest: +ELLIPSIS
     (2.7186371354862...+6.211398939416...e-05j)
     """
     an = asarray(an)
@@ -462,3 +497,9 @@ def pade(an, m, n=None):
     p = pq[:n+1]
     q = r_[1.0, pq[n+1:]]
     return poly1d(p[::-1]), poly1d(q[::-1])
+
+# %% Main for basic tests
+if __name__ == '__main__':
+    # run doctest Examples
+    import doctest
+    doctest.testmod()
