@@ -28,21 +28,36 @@ derivatives of the selected set of eigenvalues.
 
 """
 import numpy as np
-from numpy import zeros, asarray, eye, poly1d, hstack, r_
-from numpy.linalg import norm
-from scipy import linalg
-import itertools  as it
-from  eastereig.eig import AbstractEig
-from eastereig.utils import diffprodTree, div_factorial, diffprodMV
+import itertools as it
+from eastereig.eig import AbstractEig
+from eastereig.utils import _outer, diffprodTree, div_factorial
+# TODO is still sympy usefull
 import sympy as sym
+
+# // evaluation in newton method
+import concurrent.futures
+from functools import partial
+
+# multidimentional polyval
+# /!\ numpy.polynomial.polynomial.polyval != np.polyval
+from numpy.polynomial.polynomial import polyval
+import numpy.polynomial.polyutils as pu
 
 
 class CharPol():
-    """ Handle the *partial* characteristic polynomial.
-                
+    r""" Numerical representation of the *partial* characteristic polynomial.
+
         This polynomial is built from Vieta formulas and from the successive
         derivatives of the selected set of eigenvalues.
-        
+
+        This class allow to reconstruct eigenvalue loci and to locate
+        EP and the associated eigenvalue.
+
+        This polynomial can be seen as a polynomial in lambda, whom coefficients
+        are Taylor series in \(\nu_0, ..., \nu_m \)
+
+        dcoef : p(nu_0, nu_1, nu_2) = \\sum_{i,j,k} a_{i,j,k} * nu_0^i * nu_1^j * nu_2^k
+
     """
 
     def __init__(self, dLambda, nu0=None):
@@ -64,20 +79,19 @@ class CharPol():
         for i, c in enumerate(self.dcoefs):
             self.dcoefs[i] = div_factorial(c)
 
-
     def __repr__(self):
         """ Define the representation of the class
         """
         return "Instance of {}  @nu0={} with #{} derivatives.".format(self.__class__.__name__,
-                                                                     self.nu0,
-                                                                     self.dLambda[0].shape)
+                                                                      self.nu0,
+                                                                      self.dLambda[0].shape)
 
     @staticmethod
     def vieta(dLambda):
         """Compute the sucessive derivatives of the polynomial coefficients knowning
         its roots and their successive derivatives.
 
-        The methods is based on the Vieta formulas see for instance 
+        The methods is based on the Vieta formulas see for instance
         [Vieta' formulas](https://en.wikipedia.org/wiki/Vieta%27s_formulas)
 
         Parameters
@@ -131,9 +145,281 @@ class CharPol():
 
             dcoef_pol.append(dcoef_pol_*(-1)**order)
 
-
         # Return the successive derivative of the polynomial coef, no factorial !!
         return dcoef_pol
+
+    def EP_system(self, vals):
+        """ Evaluate the successive derivatives of the partial characteristic
+        polynomial with respect to lda.
+
+        This system is built on the sucessive derivatives of the partial
+        characteristic polynomial,
+
+        v = [p0, p1, ... pn]^t, where pi = d^ip0/dlda^i.
+
+        Generically, this système yields to a finite set of EP.
+
+        # TODO need to add a test (validated in toy_3doy_2params)
+        # may be also obtain with the jacobian matrix....
+
+        Parameters
+        ----------
+        vals : iterable
+            Containts the value of (lda, nu_0, ..., nu_n) where the polynom
+            must be evaluated. Althought nu is relative to nu0, absolute value
+            have to be used.
+
+        Returns
+        -------
+        v : np.array
+            Value of the vectorial function @ vals
+        """
+        # Total number of variables (N-1) nu_i + 1 lda
+        N = len(vals)
+        # polynomial degree in lda
+        deg = len(self.dcoefs)
+        # Extract input value
+        lda, *nu = vals
+        nu = np.array(nu, dtype=np.complex) - np.array(self.nu0, dtype=np.complex)
+        # compute the an coefficients at nu
+        an = np.zeros((len(self.dcoefs),), dtype=np.complex)
+        # Compute a_n at nu
+        for n, a in enumerate(self.dcoefs):
+            an[n] = pu._valnd(polyval, a, *nu)
+
+        # Compute the derivtaive with respect to lda
+
+        # Create a coefficient matrix to account for lda derivatives
+        # [[1, 1, 1, 1], [3, 2, 1, 1], [2, 1, 1, 1]
+        DA = np.ones((N, deg), dtype=np.complex)
+        for i in range(1, N):
+            DA[i, :-i] = np.arange((deg-i), 0, -1)
+        # Evaluate each polynom pi
+        v = np.zeros((N,), dtype=np.complex)
+        for n in range(0, N):
+            # apply derivative with respect to lda
+            dan = an[slice(0, deg-n)] * np.prod(DA[0:(n+1), slice(0, deg-n)], 0)
+            # np.polyval start by high degree
+            # np.polynomial.polynomial.polyval start by low degree!!!
+            v[n] = polyval(lda, dan[::-1])
+
+        return v
+
+    def jacobian(self, vals):
+        """ Compute the jacobian matrix of the EP system at nu.
+
+        This system is built on the sucessive derivatives of the partial
+        characteristic polynomial,
+
+        J = [[dp0/dlda, dp0/dnu_0 ...., dp0/dnu_n],
+             [dp1/dlda, dp1/dnu_0 ...., dp1/dnu_n],
+              .....]
+        where pi = d^ip0/dlda^i.
+
+        Generically, this système yields to a finite set of EP.
+
+        Althought nu is relative to nu0, absolute value have to be used.
+
+        # TODO need to add a test (validated in toy_3doy_2params)
+
+        Parameters
+        ----------
+        vals : iterable
+            Containts the value of (lda, nu_0, ..., nu_n) where the polynom
+            must be evaluated. Althought nu is relative to nu0, absolute value
+            have to be used.
+
+        Returns
+        -------
+        J : np.array
+            The jacobian matrix.
+
+        """
+        # Total number of variables (N-1) nu_i + 1 lda
+        N = len(vals)
+        # polynomial degree in lda
+        deg = len(self.dcoefs)
+        # Extract input value
+        lda, *nu = vals
+        nu = np.array(nu, dtype=np.complex) - np.array(self.nu0, dtype=np.complex)
+        J = np.zeros((N, N), dtype=np.complex)
+        # shape of a(nu)
+        shape = np.array(self.dcoefs[0].shape)
+        # create a coefficient matrix to account for lda derivatives
+        # [[1, 1, 1, 1], [3, 2, 1, 1], [2, 1, 1, 1]
+        DA = np.ones((N, deg), dtype=np.complex)
+        for i in range(1, N):
+            DA[i, :-i] = np.arange((deg-i), 0, -1)
+
+        # Loop of the derivative of P, fill J raws
+        for row in range(0, N):
+            # loop over the nu variables, fill column
+            for col in range(0, N):
+                # store coef for lda-evaluation
+                # recall that an[0] * lda**n
+                an = np.zeros((len(self.dcoefs),), dtype=np.complex)
+                # create the matrix accounting for derivative of coefs
+                der_coef_list = []
+                start = np.zeros_like(shape)
+                # shape of the derivatives of the coef
+                da_shape = shape.copy()
+                if col > 0:
+                    da_shape[col-1] -= 1
+                    start[col-1] += 1
+                da_slice_list = []
+                for nu_i in range(0, N-1):
+                    if nu_i == col - 1:
+                        der_coef_list.append(np.arange(1, da_shape[nu_i]+1))
+                        da_slice_list.append(slice(1, da_shape[nu_i]+1))
+                    else:
+                        der_coef_list.append(np.ones((da_shape[nu_i],)))
+                        da_slice_list.append(slice(0, da_shape[nu_i]))
+                der_coef = _outer(*der_coef_list)
+                # Loop over the polynomial coefs
+                for n, a in enumerate(self.dcoefs):
+                    # Recall that a[0,...,0] * nu0**0 * ... * nu_m**0
+                    # Create a zeros matrix
+                    da = np.zeros(da_shape, dtype=np.complex)
+                    # and fill it with the shifted the coef matrix
+                    da = a[tuple(da_slice_list)] * der_coef
+                    an[n] = pu._valnd(polyval, da, *nu)
+                # apply derivative with respect to lda
+                if col == 0:
+                    # Increase the derivation order
+                    dan = an[0:-(row+1)] * np.prod(DA[1:(row+2), :-(row+1)], 0)
+                else:
+                    # Apply successived derivative of the parial Char pol
+                    dan = an[slice(0, deg-row)] * np.prod(DA[0:(row+1), slice(0, deg-row)], 0)
+                    # np.polyval start by high degree
+                    # np.polynomial.polynomial.polyval start by low degree!!!
+                J[row, col] = polyval(lda, dan[::-1])
+
+        return J
+
+    def eval_at(self, vals):
+        """ Evaluate the partial caracteristic polynomial at (lda, nu).
+
+        Parameters
+        ----------
+        vals : iterable
+            Containts the value of (lda, nu_0, ..., nu_n) where the polynom
+            must be evaluated. Althought nu is relative to nu0, absolute value
+            have to be used.
+
+        Returns
+        -------
+        The partial caracteristic polynomial at (lda, nu).
+
+        # TODO need to add a test (validated in toy_3doy_2params)
+        """
+        # Extract input value
+        lda, *nu = vals
+        nu = np.array(nu, dtype=np.complex) - np.array(self.nu0, dtype=np.complex)
+        an = np.zeros((len(self.dcoefs),), dtype=np.complex)
+        # Compute a_n at nu
+        for n, a in enumerate(self.dcoefs):
+            an[n] = pu._valnd(polyval, a, *nu)
+
+        # np.polyval start by high degree
+        # np.polynomial.polynomial.polyval start by low degree!!!
+        return polyval(lda, an[::-1])
+
+    @staticmethod
+    def _newton(f, J, x0, tol=1e-8):
+        """ Basic Newton method for vectorial function.
+
+        Parameters
+        ----------
+        f : function
+            The vectorial function we want to find the roots. Must Returns
+            an array of size N.
+        J : function
+            Function that provides the Jacobian matrix NxN.
+        x0 : array
+            The initial guess of size N.
+        tol : float
+            The tolerance to stop iteration.
+
+        Returns
+        -------
+        x : array
+            The solution or None of NiterMax has been reach or if the
+            computation fail. 
+        """
+
+        # set max iteration number
+        NiterMax = 25
+        x = np.array(x0)
+        k = 0
+        cond = True
+
+        while cond:
+            fx = f(x)
+            # working on polynomial may leads to trouble if x is outside the
+            # convergence radius. Use try/except
+            try:
+                x = x - np.linalg.inv(J(x)) @ fx
+                k += 1
+                cond = (k < NiterMax) and np.linalg.norm(fx) > tol
+            except:
+                print('Cannot compute Newton iteration at x=', x)
+                print('  when starting from x0=', x0)
+                return None
+
+        # if stops
+        if k < NiterMax:
+            return x
+        else:
+            return None
+
+    def newton(self, bounds, Npts=5, decimals=6, max_workers=4):
+        """ Mesh parametric space and run newton search on each point in
+            parallel.
+
+        bounds : iterable
+            each item must contains the 2 bounds in the complex plane. For
+            instance if bounds = [(-1-1j, 1+1j), (-2-2j, 2+2j)],
+            the points will be put in this C**2 domain.
+            Althought nu is relative to nu0, absolute value have to be used.
+
+        Npts : int
+            The number of point in each direction between the bounds.
+
+        decimals : int
+            The number of decimals keep to filter the solution
+
+        max_workers : int
+            The number of worker to explore the parametric space.
+
+        Returns
+        -------
+        sol : array
+            The N 'unique' solutions for the M unknowns in a NxM array.
+        """
+        # TODO May limit bounds by convergence radius ?
+
+        # Create a coarse mesh of the parametric space for Newton solving
+        grid = []
+        for bound in bounds:
+            grid.append(np.linspace(bound[0], bound[1], Npts))
+
+        # For each, run Newton search
+        all_sol = []
+        # use partial to fixed all function parameters except lda
+        _p_newton = partial(self._newton, self.EP_system, self.jacobian)
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+            for s in executor.map(_p_newton,
+                                  it.product(*grid),
+                                  chunksize=1):
+                all_sol.append(s)
+
+        # Filter all solution to keep only unique
+        # Remove None and convert to array
+        sol_ = np.array([s for s in all_sol if s is not None])
+        # Use unique to remove duplicated row
+        sol = np.unique(sol_.round(decimals=decimals), axis=0)
+
+        return sol
 
     @staticmethod
     def taylor2sympyPol(coef_list, tol=1e-12):
@@ -197,33 +483,37 @@ class CharPol():
         """
         # TODO add Nmax...
         # Create the Ideal form by partial characteristic and its derivative
-        I = []
+        ideals = []
         p0, variables = self.taylor2sympyPol(self.dcoefs, tol)
         print(p0)
-        I.append(p0)
+        ideals.append(p0)
         # FIXME : Assume lda is the first in lex order
         lda = variables[0]
         # Create an ideals using #variables derivaties of p0
         for i in range(1, len(p0.degree_list())):
-            I.append(sym.diff(I[i-1], lda))
+            ideals.append(ideals[i-1].diff(lda))
         # Use lex ordering since it has elimination property
-        g = sym.groebner(I, method='f5b', domain='C', order='lex')
+        g = sym.groebner(ideals, method='f5b', domain='CC', order='lex')
         # solve numerically
         variables = list(g.free_symbols)
         variables.sort(key=str)
         if g.is_zero_dimensional:
-            # see Ideals, varieties and Algorithms, p. 230
+            # see ideals, varieties and Algorithms, p. 230
             ep = CharPol._rec_solve(g, variables)
         else:
             print('Warning: g is not 0 dimensional.')
             ep = None
 
-        return ep, p0
+        return ep, p0, g, ideals
 
     @staticmethod
     def _rec_solve(g, variables, nu=None, sol=None):
         """ Recursive elimination of the Groebner bases for the variables
         contains in `variables`.
+
+        # FIXME not fully working !!
+        - need to check 0 after substitution
+        - need to check if wrong solution occured ex: 2=0
 
         Parameters
         ----------
@@ -244,23 +534,35 @@ class CharPol():
 
         Exemples
         --------
-        Based on sympy `nonlinsolve` examples
-        >>> x, y = sym.symbols('x,y')
-        >>> F = [sym.poly(x**2 - 2*y**2 - 2, x,y, domain='CC'), sym.poly(x*y - 2, x,y, domain='CC')]
+        # Based on sympy `nonlinsolve` examples
+        # >>> x, y = sym.symbols('x, y')
+        # >>> F = [sym.poly(x**2 - 2*y**2 - 2, x,y, domain='CC'), sym.poly(x*y - 2, x,y, domain='CC')]
+        # >>> g = sym.groebner(F, method='f5b', domain='CC')
+        # >>> sol = CharPol._rec_solve(g, [x, y])
+
+        # The references solution from sympy doc (symbolic)
+        # FiniteSet((-2, -1), (2, 1), (-sqrt(2)*I, sqrt(2)*I), (sqrt(2)*I, -sqrt(2)*I))
+        # >>> sol_ref = [[-2, -1], [2, 1], [-np.sqrt(2)*1j, np.sqrt(2)*1j], [np.sqrt(2)*1j, -np.sqrt(2)*1j]]
+
+        # Check if the two sets are identical up to round-off error, using complex number
+        # for ordering each set.
+        # >>> sol_c = np.sort(np.array([a[0]+1j*a[1] for a in sol]))
+        # >>> sol_ref_c = np.sort(np.array([a[0]+1j*a[1] for a in sol_ref]))
+        # >>> np.linalg.norm(sol_c - sol_ref_c) < 1e-10
+        # True
+
+
+        Based on Ideals, Varieties and algorithms, p. 122
+        >>> x, y, z = sym.symbols('x, y, z')
+        >>> F = [sym.Poly(x**2 + y + z - 1, x, y, z, domain='CC'), sym.Poly(x + y**2 + z -1, x,y,z, domain='CC'), sym.Poly(x + y + z**2 -1, x,y,z, domain='CC')]
         >>> g = sym.groebner(F, method='f5b', domain='CC')
-        >>> sol = CharPol._rec_solve(g, [x, y])
+        >>> sol = CharPol._rec_solve(g, [x, y, z])
 
-        The references solution from sympy doc (symbolic)
-        FiniteSet((-2, -1), (2, 1), (-sqrt(2)*I, sqrt(2)*I), (sqrt(2)*I, -sqrt(2)*I))
-        >>> sol_ref = [[-2, -1], [2, 1], [-np.sqrt(2)*1j, np.sqrt(2)*1j], [np.sqrt(2)*1j, -np.sqrt(2)*1j]]
-
-        Check if the two sets are identical up to round-off error, using complex number
-        for ordering each set.
-        >>> sol_c = np.sort(np.array([a[0]+1j*a[1] for a in sol]))
-        >>> sol_ref_c = np.sort(np.array([a[0]+1j*a[1] for a in sol_ref]))
-        >>> np.linalg.norm(sol_c - sol_ref_c) < 1e-10
-        True
         """
+        # DEBUG
+        if len(g) == 4:
+            print('here we are')
+
         # At FIRST call :
         # Create the solution list if needed
         if sol is None:
@@ -273,41 +575,57 @@ class CharPol():
         N = len(variables)
 
         # Process the remaining part of g...
-        if len(g) != 0:
+        cond = True  # be sur to enter in the while loop
+        r_list = []
+        # several groebner basis polynomials may be univariate
+        # we loop on them
+        while cond:
             # Extract the last univariate polynomial
+            g_ = g.pop()
             # create a poly since 'subs' destroy poly.
             # use free_symbols to find the involved variables
-            # use all_coeffs else missing 0 coefs for numpy roots
-            g_ = g.pop()
             last_g = sym.poly(g_, g_.free_symbols, domain='CC')
             # Convert it into numpy univariate polynomial format
-            c = np.array(last_g.all_coeffs(), dtype=np.complex)
+            # use all_coeffs else missing 0 coefs for numpy roots
+            if len(last_g.free_symbols) > 0:
+                c = np.array(last_g.all_coeffs(), dtype=np.complex)
+            else:
+                # No solution, return without modification
+                return sol
             # Compute its the roots **numerically**
-            r = np.roots(c)
+            # ri = np.roots(c)
+            ri = np.array(list(sym.roots(last_g).keys()))
+            r_list.append(ri)
+            print(last_g.gens, ri)
+            if len(g) != 0:
+                cond = last_g.free_symbols == g[-1].free_symbols
+            else:
+                cond = False
+        # contains all the roots of all univariates polynomials with the same variables
+        r = np.concatenate(r_list)
+        # Loop over all the roots and process recursivelly
+        # the next polynomials
+        for ri in r:
+            # Appends the already knwon variables
+            if nu is None:
+                nui = [ri]
+            else:
+                # nui is fill from the left side (since elimination is done
+                # in reversed order)
+                nui = [ri, *nu]
 
-            # Loop over all the roots and process recursivelly
-            # the next polynomials
-            for ri in r:
-                # Appends the already knwon variables
-                if nu is None:
-                    nui = [ri]
-                else:
-                    # nui is fill from the left side (since elimination is done
-                    # in reversed order)
-                    nui = [ri, *nu]
-
-                if len(nui) == N:
-                    # End of recurence
-                    # Appends new solutions
-                    sol.append(nui)
-                else:
-                    # Recursive call for next polynomial
-                    # Create a dict with already knwon variables
-                    variables_ = {variables[-(i+1)]: nu_ for i, nu_ in enumerate(nui)}
-                    # Remarks : subs destroy poly and create 'add' object
-                    gi = [gi_.subs(variables_) for gi_ in g]
-                    sol = CharPol._rec_solve(gi, variables, nui, sol)
-            return sol
+            if len(nui) == N:
+                # End of recurence
+                # Appends new solutions
+                sol.append(nui)
+            else:
+                # Recursive call for next polynomial
+                # Create a dict with already knwon variables
+                variables_ = {variables[-(i+1)]: nu_ for i, nu_ in enumerate(nui)}
+                # Remarks : subs destroy poly and create 'add' object
+                gi = [gi_.subs(variables_) for gi_ in g]
+                sol = CharPol._rec_solve(gi, variables, nui, sol)
+        return sol
 
     def discriminant(self):
         pass
@@ -489,6 +807,20 @@ class CharPol():
 # %% Main for basic tests
 if __name__ == '__main__':
     # run doctest Examples
-    import doctest
-    doctest.testmod()
+    # import doctest
+    # doctest.testmod()
+    x, y, z = sym.symbols('x, y, z')
+    F = [sym.Poly(x**2 + y + z - 1, x, y, z, domain='CC'),
+         sym.Poly(x + y**2 + z - 1, x,y,z, domain='CC'),
+         sym.Poly(x + y + z**2 - 1, x,y,z, domain='CC')]
+    g = sym.groebner(F, method='f5b', domain='CC')
+    sol = CharPol._rec_solve(g, [x, y, z])
+
+    # check solutions
+    for s in sol:
+        x_, y_, z_ = s
+        f_ = []
+        for f in F:
+            f_.append(abs(sym.N(f.subs({x: x_, y: y_, z: z_}))))
+        print(np.sum(f_) < 1e-10, '  ',f_, s, '\n')
 
