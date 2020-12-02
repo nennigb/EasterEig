@@ -73,15 +73,15 @@ class Network(ee.OPmv):
         # initialize OP interface
         self.setnu0(nu0)
 
-        # # mandatory -----------------------------------------------------------
+        # mandatory -----------------------------------------------------------
         self._lib = 'numpy'
-        # # create the operator matrices
+        # create the operator matrices
         self.K = [Kmat, Mmat]
-        # # define the list of function to compute  the derivatives of each operator matrix
+        # define the list of function to compute  the derivatives of each operator matrix
         self.dK = [self._dstiff, self._dmass]
-        # # define the list of function to set the eigenvalue dependance of each operator matrix
+        # define the list of function to set the eigenvalue dependance of each operator matrix
         self.flda = [None, ee.lda_func.Lda]
-        # # ---------------------------------------------------------------------
+        # ---------------------------------------------------------------------
 
     # possible to add new methods
     def __repr__(self):
@@ -191,7 +191,7 @@ def sympy_check(nu0, sympyfile):
     # set max // workers
     max_workers = 3
     # derivatives order
-    N = (5, 5)
+    N = (1, 1)
     # FIXME hard coded parameters
     m = 1.
     k = 1.
@@ -204,9 +204,17 @@ def sympy_check(nu0, sympyfile):
                     [-k, 2*k, -k],
                     [0., -k, nu+k]])
     # Symbols
-    p0 = sym.det(K - lda*M)
+    p0 = sym.det(K + lda*M)
     p1 = sym.diff(p0, lda)
     p2 = sym.diff(p1, lda)
+
+    # solve with groebner
+    F = [p0, p1, p2]
+    g = sym.groebner(F, method='f5b', domain='CC')
+    NewOption = sym.Options(g.gens, {'domain': 'CC'})
+    # sol = _solve_reduced_system2(F, F[0].gens)
+    EP_sym = solve_generic(g, NewOption)
+
     # solve for lda
     ldas = sym.solve(p0, lda)
     dlda = dict()
@@ -221,20 +229,41 @@ def sympy_check(nu0, sympyfile):
 
     np.savez(sympyfile, dlda=dlda)
 
-    return dlda
+    return dlda, EP_sym
+
+def sympy_jac_check(p0, val):
+    """ Validation of Jacobian matrix computation
+    """
+
+    gens = p0.gens
+    lda, nu0, nu1 = gens
+    N = len(val)
+    P = [p0.diff((lda, i)) for i in range(0, N)]
+    J = np.zeros((N, N), dtype=np.complex)
+    v = np.zeros((N,), dtype=np.complex)
+    for row in range(0, N):
+        v[row] = np.complex(P[row].subs(dict(zip(gens, val))))
+        for col in range(0, N):
+            J[row, col] = np.complex(sym.diff(P[row], gens[col]).subs(dict(zip(gens, val))))
+    return J, v
+
+
+
+
+
+
+
+
 
 
 # %% MAIN
 if __name__ == '__main__':
-
-    import itertools as it
-    from multiple import *
-    from scipy.special import factorial
-
+    from scipy import optimize
+    from sympy.solvers.polysys import solve_generic
     np.set_printoptions(linewidth=150)
     Nderiv = (5, 5)
     # tuple of the inital param
-    nu0 = (1., 1)
+    nu0 = (1., 1.) # problem si (1, 1)
     # Sympy check parameters
     sym_check = False
     sympyfile =  'sympy_dlda'
@@ -253,8 +282,37 @@ if __name__ == '__main__':
     net.solver.destroy()
     print('> Eigenvalue :', Lambda)
 
-    vp = extracted[0]
-    vp.getDerivativesMV(Nderiv, net)
+    for vp in extracted:
+        vp.getDerivativesMV(Nderiv, net)
+
+    C = ee.CharPol(extracted)
+    p0, variables = ee.CharPol.taylor2sympyPol(C.dcoefs)
+    _lda, _nu0, _nu1 =  variables
+    # check eval_at method
+
+    # Need to add a test
+    # vals = (1. +1j, 0.7+1j, -1.2+1j)
+    vals = (1.+1j, 0.7-1j, -1.2+0.3j)
+    cp = C.eval_at(vals)
+    p0_ = p0.subs({_lda:vals[0], _nu0: vals[1], _nu1: vals[2]})
+    J = C.jacobian(vals)
+    Jsym, vsym = sympy_jac_check(p0, vals)
+    v = C.EP_system(vals)
+    val_ep = np.array((2.0000000000001172-1.73205080756872j,
+                       0.5000000000000471-2.598076211353326j,
+                       1.499999999999996-2.5980762113533107j))
+    # test NR
+    sol = C.newton(((1-2j, 3+3j),
+                    (-3-3j, 3+3j),
+                    (-3-3j, 3+3j)), decimals=8)
+
+
+    # recover the good polynomial
+    # sym.roots(p0.subs({_nu0: 0, _nu1: 0}))
+    # @nu0=(0.5, 0.7). Eigenvalue : [0.36708537+0.j 1.60198927+0.j 3.23092537+0.j]
+    # sym.roots(p0.subs({nu0: -0.5, nu1: -0.3}))
+
+    # sol = C.groebner_solve()
     # # get derivativ of allupto
     # dLambda=[]
     # for i, vp in enumerate(extracted):
@@ -268,8 +326,10 @@ if __name__ == '__main__':
     #         vp.export(name + '_vp_' + str(i), eigenvec=False)
     # %% Check with sympy
     if sym_check:
-        dlda_ref = sympy_check(nu0, sympyfile)
+        dlda_ref, EP_sym = sympy_check(nu0, sympyfile)
+        # computed for mu=nu=1
         """
+        /!\ wrong sign here
         dlda_ref[0].real
         array([[-3.41421356, -0.25      , -0.22097087, -0.1875    , -0.02900243],
                [-0.25      ,  0.13258252,  0.0625    , -0.06214806, -0.28125   ],
@@ -277,14 +337,14 @@ if __name__ == '__main__':
                [-0.1875    , -0.06214806,  0.09375   ,  0.39425174,  0.5625    ],
                [-0.02900243, -0.28125   , -0.22204983,  0.5625    ,  3.47561795]])
 
-    dlda_ref[1].real
+        dlda_ref[1].real
         array([[-0.58578644, -0.25      ,  0.22097087, -0.1875    ,  0.02900243],
                [-0.25      , -0.13258252,  0.0625    ,  0.06214806, -0.28125   ],
                [ 0.22097087,  0.0625    , -0.10358009,  0.09375   ,  0.22204983],
                [-0.1875    ,  0.06214806,  0.09375   , -0.39425174,  0.5625    ],
                [ 0.02900243, -0.28125   ,  0.22204983,  0.5625    , -3.47561795]])
 
-    dlda_ref[2].real
+        dlda_ref[2].real
         array([[-2.00000000e+00, -5.00000000e-01, -8.39220777e-18,  3.75000000e-01,  7.55586683e-18],
                [-5.00000000e-01,  4.02810988e-18, -1.25000000e-01,  8.51605573e-18,  5.62500000e-01],
                [-8.39220777e-18, -1.25000000e-01,  3.71511123e-18, -1.87500000e-01,  7.77698184e-18],
