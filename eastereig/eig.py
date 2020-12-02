@@ -703,7 +703,14 @@ class NumpyEig(AbstractEig):
             # must be done before L1x
             v = np.ones(shape=self.x.shape)
             # see also VecScale
-            self.x *= (1/v.dot(self.x))
+            scale = (1/v.dot(self.x))
+            if np.abs(scale) < 1e6:
+                self.x *= scale
+            else:
+                print('Warning : x is nearly co-linear to v. Use random vector for v...')
+                v = np.random.rand(*self.x.shape)
+                self.x *= (1/v.dot(self.x))
+
             # Create an empty array of object
             self.dx = np.empty(N, dtype=object)
             self.dx.flat[0] = self.x
@@ -748,6 +755,7 @@ class NumpyEig(AbstractEig):
                     # store the value
                     self.dlda[n] = derivee
                     self.dx[n] = u.copy()[:-1]
+            print(self.dlda)
 
 # end class NumpyEig
 
