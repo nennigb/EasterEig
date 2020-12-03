@@ -40,8 +40,10 @@ from functools import partial
 
 # multidimentional polyval
 # /!\ numpy.polynomial.polynomial.polyval != np.polyval
-from numpy.polynomial.polynomial import polyval
-import numpy.polynomial.polyutils as pu
+# from numpy.polynomial.polynomial import polyval
+# import numpy.polynomial.polyutils as pu
+from eastereig.fpoly.fpoly import polyvalnd
+
 
 
 class CharPol():
@@ -185,7 +187,8 @@ class CharPol():
         an = np.zeros((len(self.dcoefs),), dtype=np.complex)
         # Compute a_n at nu
         for n, a in enumerate(self.dcoefs):
-            an[n] = pu._valnd(polyval, a, *nu)
+            # an[n] = pu._valnd(polyval, a, *nu)
+            an[n] = polyvalnd(nu, a)
 
         # Compute the derivtaive with respect to lda
 
@@ -201,7 +204,7 @@ class CharPol():
             dan = an[slice(0, deg-n)] * np.prod(DA[0:(n+1), slice(0, deg-n)], 0)
             # np.polyval start by high degree
             # np.polynomial.polynomial.polyval start by low degree!!!
-            v[n] = polyval(lda, dan[::-1])
+            v[n] = polyvalnd(lda, dan[::-1])
 
         return v
 
@@ -282,7 +285,8 @@ class CharPol():
                     da = np.zeros(da_shape, dtype=np.complex)
                     # and fill it with the shifted the coef matrix
                     da = a[tuple(da_slice_list)] * der_coef
-                    an[n] = pu._valnd(polyval, da, *nu)
+                    # an[n] = pu._valnd(polyval, da, *nu)
+                    an[n] = polyvalnd(nu, da)
                 # apply derivative with respect to lda
                 if col == 0:
                     # Increase the derivation order
@@ -292,8 +296,8 @@ class CharPol():
                     dan = an[slice(0, deg-row)] * np.prod(DA[0:(row+1), slice(0, deg-row)], 0)
                     # np.polyval start by high degree
                     # np.polynomial.polynomial.polyval start by low degree!!!
-                J[row, col] = polyval(lda, dan[::-1])
-
+                # J[row, col] = polyval(lda, dan[::-1])
+                J[row, col] = polyvalnd(lda, dan[::-1])
         return J
 
     def eval_at(self, vals):
@@ -318,14 +322,15 @@ class CharPol():
         an = np.zeros((len(self.dcoefs),), dtype=np.complex)
         # Compute a_n at nu
         for n, a in enumerate(self.dcoefs):
-            an[n] = pu._valnd(polyval, a, *nu)
+            # an[n] = pu._valnd(polyval, a, *nu)
+            an[n] = polyvalnd(nu, a)
 
         # np.polyval start by high degree
         # np.polynomial.polynomial.polyval start by low degree!!!
-        return polyval(lda, an[::-1])
+        return polyvalnd(lda, an[::-1])
 
     @staticmethod
-    def _newton(f, J, x0, tol=1e-8):
+    def _newton(f, J, x0, tol=1e-8, normalized=True, verbose=False):
         """ Basic Newton method for vectorial function.
 
         Parameters
@@ -339,6 +344,11 @@ class CharPol():
             The initial guess of size N.
         tol : float
             The tolerance to stop iteration.
+        normalized : bool
+            If `True` the tol is applied to the ratio of the ||f(x)||/||f(x0)||
+        verbose : bool
+            print iteration log.
+            
 
         Returns
         -------
@@ -348,19 +358,27 @@ class CharPol():
         """
 
         # set max iteration number
-        NiterMax = 25
+        NiterMax = 150
         x = np.array(x0)
         k = 0
         cond = True
 
         while cond:
             fx = f(x)
+            if k == 0:
+                norm_fx0 = np.linalg.norm(fx)
             # working on polynomial may leads to trouble if x is outside the
             # convergence radius. Use try/except
             try:
                 x = x - np.linalg.inv(J(x)) @ fx
+                if verbose:
+                    print(k, x, abs(fx))
                 k += 1
-                cond = (k < NiterMax) and np.linalg.norm(fx) > tol
+                # condition
+                if normalized:
+                    cond = (k < NiterMax) and (np.linalg.norm(fx)/norm_fx0) > tol
+                else:
+                    cond = (k < NiterMax) and np.linalg.norm(fx) > tol
             except:
                 print('Cannot compute Newton iteration at x=', x)
                 print('  when starting from x0=', x0)
@@ -372,7 +390,7 @@ class CharPol():
         else:
             return None
 
-    def newton(self, bounds, Npts=5, decimals=6, max_workers=4):
+    def newton(self, bounds, Npts=5, decimals=6, max_workers=4, tol=1e-4, verbose=False):
         """ Mesh parametric space and run newton search on each point in
             parallel.
 
@@ -381,15 +399,16 @@ class CharPol():
             instance if bounds = [(-1-1j, 1+1j), (-2-2j, 2+2j)],
             the points will be put in this C**2 domain.
             Althought nu is relative to nu0, absolute value have to be used.
-
         Npts : int
             The number of point in each direction between the bounds.
-
         decimals : int
             The number of decimals keep to filter the solution
-
         max_workers : int
             The number of worker to explore the parametric space.
+        normalized : bool
+            If `True` the tol is applied to the ratio of the ||f(x)||/||f(x0)||
+        verbose : bool
+            print iteration log.
 
         Returns
         -------
@@ -406,7 +425,8 @@ class CharPol():
         # For each, run Newton search
         all_sol = []
         # use partial to fixed all function parameters except lda
-        _p_newton = partial(self._newton, self.EP_system, self.jacobian)
+        _p_newton = partial(self._newton, self.EP_system, self.jacobian, tol=tol,
+                            verbose=verbose)
         with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
             for s in executor.map(_p_newton,
                                   it.product(*grid),
