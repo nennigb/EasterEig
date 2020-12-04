@@ -30,7 +30,6 @@ We would like to find the EP3.
 
 @author: bn
 """
-
 import numpy as np
 import eastereig as ee
 import matplotlib.pyplot as plt
@@ -231,13 +230,18 @@ def sympy_check(nu0, sympyfile):
 
     return dlda, EP_sym
 
-def sympy_jac_check(p0, val):
+def sympy_jac_check(p0, nu, val):
     """ Validation of Jacobian matrix computation
+
+    val : iterable
+        absolute value of the paramter.
     """
 
     gens = p0.gens
     lda, nu0, nu1 = gens
     N = len(val)
+    val = np.array(val)
+    val[1::] = val[1::] - np.array(nu)
     P = [p0.diff((lda, i)) for i in range(0, N)]
     J = np.zeros((N, N), dtype=np.complex)
     v = np.zeros((N,), dtype=np.complex)
@@ -250,14 +254,11 @@ def sympy_jac_check(p0, val):
 
 
 
-
-
-
-
-
-
 # %% MAIN
+    
 if __name__ == '__main__':
+
+
     from scipy import optimize
     from sympy.solvers.polysys import solve_generic
     np.set_printoptions(linewidth=150)
@@ -292,19 +293,22 @@ if __name__ == '__main__':
 
     # Need to add a test
     # vals = (1. +1j, 0.7+1j, -1.2+1j)
-    vals = (1.+1j, 0.7-1j, -1.2+0.3j)
+    vals = (1.+1j, 0.7-1j, -1.2+0.3j)  # absolute !
     cp = C.eval_at(vals)
-    p0_ = p0.subs({_lda:vals[0], _nu0: vals[1], _nu1: vals[2]})
+    p0_ = p0.subs({_lda:vals[0], _nu0: vals[1]-nu0[0], _nu1: vals[2]-nu0[0]})
     J = C.jacobian(vals)
-    Jsym, vsym = sympy_jac_check(p0, vals)
+    Jsym, vsym = sympy_jac_check(p0, nu0, vals)
+    print('> Erreur J vs Jsym :', np.linalg.norm(J-Jsym))
+    print('> Erreur p vs psym :', np.abs(cp-p0_))
     v = C.EP_system(vals)
+    # s = C._newton(C.EP_system, C.jacobian, vals, tol=1e-6, verbose=True)
     val_ep = np.array((2.0000000000001172-1.73205080756872j,
-                       0.5000000000000471-2.598076211353326j,
-                       1.499999999999996-2.5980762113533107j))
+                        0.5000000000000471-2.598076211353326j,
+                        1.499999999999996-2.5980762113533107j))
     # test NR
     sol = C.newton(((1-2j, 3+3j),
                     (-3-3j, 3+3j),
-                    (-3-3j, 3+3j)), decimals=8)
+                    (-3-3j, 3+3j)), decimals=8, max_workers=4)
 
 
     # recover the good polynomial
