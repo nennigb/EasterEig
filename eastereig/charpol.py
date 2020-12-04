@@ -81,6 +81,9 @@ class CharPol():
         for i, c in enumerate(self.dcoefs):
             self.dcoefs[i] = np.asfortranarray(div_factorial(c))
 
+        # Compute usefull coefficients for jacobian evaluation
+        self._jacobian_utils()
+
     def __repr__(self):
         """ Define the representation of the class
         """
@@ -208,6 +211,66 @@ class CharPol():
 
         return v
 
+    def _jacobian_utils(self):
+        """ Precompute the shifted indices and combinatoric elements used
+        in jacobian matrix (N+1) x (N+1).
+
+        Attributes
+        ----------
+        _dlda_prod : np.array 
+            Coefficients used in 1D (lda) polynomial derivative.
+        _der_coef : np.array
+            Coefficients used in ND (nu_0, ..., nu_N) polynomial derivative.
+        _da_slice : np.array
+            List of slices of da array.
+        _da_shape : np.array
+            List of shape of da array.
+        """
+        # get number of Parameters
+        N = len(self.dcoefs[0].shape) + 1
+        # polynomial degree in lda
+        deg = len(self.dcoefs)
+        # shape of a(nu)
+        shape = np.array(self.dcoefs[0].shape)
+        # Create a coefficient matrix dlda_prod to account for lda derivatives
+        # [[1, 1, 1, 1], [3, 2, 1, 1], [2, 1, 1, 1]
+        DA = np.ones((N+1, deg), dtype=np.complex)
+        for i in range(1, N+1):
+            DA[i, :-i] = np.arange((deg-i), 0, -1)
+        self._dlda_prod = np.cumprod(DA, 0)
+
+        # Create Coefficients used nu_i derivatives
+        self._der_coef = np.empty((N, N), dtype=np.object)
+        self._da_slice = np.empty((N, N), dtype=np.object)
+        self._da_shape = np.empty((N, N), dtype=np.object)
+        # Loop of the derivative of P, fill J raws
+        for row in range(0, N):
+            # loop over the nu variables, fill column
+            for col in range(0, N):
+                # store coef for lda-evaluation
+                # recall that an[0] * lda**n
+                an = np.zeros((len(self.dcoefs),), dtype=np.complex)
+                # create the matrix accounting for derivative of coefs
+                der_coef_list = []
+                start = np.zeros_like(shape)
+                # shape of the derivatives of the coef
+                da_shape = shape.copy()
+                if col > 0:
+                    da_shape[col-1] -= 1
+                    start[col-1] += 1
+                da_slice_list = []
+                for nu_i in range(0, N-1):
+                    if nu_i == col - 1:
+                        der_coef_list.append(np.arange(1, da_shape[nu_i]+1))
+                        da_slice_list.append(slice(1, da_shape[nu_i]+1))
+                    else:
+                        der_coef_list.append(np.ones((da_shape[nu_i],)))
+                        da_slice_list.append(slice(0, da_shape[nu_i]))
+                # Maintains fortran ordering
+                self._der_coef[row, col] = np.asfortranarray(_outer(*der_coef_list))
+                self._da_slice[row, col] = tuple(da_slice_list)
+                self._da_shape[row, col] = da_shape.copy()
+
     def jacobian(self, vals):
         """ Compute the jacobian matrix of the EP system at nu.
 
@@ -237,6 +300,11 @@ class CharPol():
         J : np.array
             The jacobian matrix.
 
+        Notes
+        -----
+        Works with _jacobian_utils method. This methods will create some required
+        indices and constants array.
+
         """
         # Total number of variables (N-1) nu_i + 1 lda
         N = len(vals)
@@ -246,15 +314,13 @@ class CharPol():
         lda, *nu = vals
         nu = np.array(nu, dtype=np.complex) - np.array(self.nu0, dtype=np.complex)
         J = np.zeros((N, N), dtype=np.complex)
-        # shape of a(nu)
-        shape = np.array(self.dcoefs[0].shape)
-        # Create a coefficient matrix dlda_prod to account for lda derivatives
-        # [[1, 1, 1, 1], [3, 2, 1, 1], [2, 1, 1, 1]
-        # TODO move in self with der_coef ?
-        DA = np.ones((N+1, deg), dtype=np.complex)
-        for i in range(1, N+1):
-            DA[i, :-i] = np.arange((deg-i), 0, -1)
-        dlda_prod = np.cumprod(DA, 0)
+
+        # Alias coefficient matrix dlda_prod to account for lda derivatives
+        dlda_prod = self._dlda_prod
+        # Alias coefficients and indices matrices to account for nu derivatives
+        der_coef = self._der_coef
+        da_slice = self._da_slice
+        da_shape = self._da_shape
 
         # Loop of the derivative of P, fill J raws
         for row in range(0, N):
@@ -263,32 +329,14 @@ class CharPol():
                 # store coef for lda-evaluation
                 # recall that an[0] * lda**n
                 an = np.zeros((len(self.dcoefs),), dtype=np.complex)
-                # create the matrix accounting for derivative of coefs
-                der_coef_list = []
-                start = np.zeros_like(shape)
-                # shape of the derivatives of the coef
-                da_shape = shape.copy()
-                if col > 0:
-                    da_shape[col-1] -= 1
-                    start[col-1] += 1
-                da_slice_list = []
-                for nu_i in range(0, N-1):
-                    if nu_i == col - 1:
-                        der_coef_list.append(np.arange(1, da_shape[nu_i]+1))
-                        da_slice_list.append(slice(1, da_shape[nu_i]+1))
-                    else:
-                        der_coef_list.append(np.ones((da_shape[nu_i],)))
-                        da_slice_list.append(slice(0, da_shape[nu_i]))
-                # maintains fortran ordering
-                der_coef = np.asfortranarray(_outer(*der_coef_list))
                 # Loop over the polynomial coefs
                 for n, a in enumerate(self.dcoefs):
                     # Recall that a[0,...,0] * nu0**0 * ... * nu_m**0
                     # Create a zeros matrix
                     # Maintains fortran ordering
-                    da = np.zeros(da_shape, dtype=np.complex, order='F')
+                    da = np.zeros(da_shape[row, col], dtype=np.complex, order='F')
                     # and fill it with the shifted the coef matrix
-                    da = a[tuple(da_slice_list)] * der_coef
+                    da = a[da_slice[row, col]] * der_coef[row, col]
                     # an[n] = pu._valnd(polyval, da, *nu)
                     an[n] = polyvalnd(nu, da)
                 # apply derivative with respect to lda
