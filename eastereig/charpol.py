@@ -79,7 +79,7 @@ class CharPol():
         # Compute the polynomial coef
         self.dcoefs = self.vieta(self.dLambda)
         for i, c in enumerate(self.dcoefs):
-            self.dcoefs[i] = div_factorial(c)
+            self.dcoefs[i] = np.asfortranarray(div_factorial(c))
 
     def __repr__(self):
         """ Define the representation of the class
@@ -248,11 +248,13 @@ class CharPol():
         J = np.zeros((N, N), dtype=np.complex)
         # shape of a(nu)
         shape = np.array(self.dcoefs[0].shape)
-        # create a coefficient matrix to account for lda derivatives
+        # Create a coefficient matrix dlda_prod to account for lda derivatives
         # [[1, 1, 1, 1], [3, 2, 1, 1], [2, 1, 1, 1]
-        DA = np.ones((N, deg), dtype=np.complex)
-        for i in range(1, N):
+        # TODO move in self with der_coef ?
+        DA = np.ones((N+1, deg), dtype=np.complex)
+        for i in range(1, N+1):
             DA[i, :-i] = np.arange((deg-i), 0, -1)
+        dlda_prod = np.cumprod(DA, 0)
 
         # Loop of the derivative of P, fill J raws
         for row in range(0, N):
@@ -277,12 +279,14 @@ class CharPol():
                     else:
                         der_coef_list.append(np.ones((da_shape[nu_i],)))
                         da_slice_list.append(slice(0, da_shape[nu_i]))
-                der_coef = _outer(*der_coef_list)
+                # maintains fortran ordering
+                der_coef = np.asfortranarray(_outer(*der_coef_list))
                 # Loop over the polynomial coefs
                 for n, a in enumerate(self.dcoefs):
                     # Recall that a[0,...,0] * nu0**0 * ... * nu_m**0
                     # Create a zeros matrix
-                    da = np.zeros(da_shape, dtype=np.complex)
+                    # Maintains fortran ordering
+                    da = np.zeros(da_shape, dtype=np.complex, order='F')
                     # and fill it with the shifted the coef matrix
                     da = a[tuple(da_slice_list)] * der_coef
                     # an[n] = pu._valnd(polyval, da, *nu)
@@ -290,10 +294,12 @@ class CharPol():
                 # apply derivative with respect to lda
                 if col == 0:
                     # Increase the derivation order
-                    dan = an[0:-(row+1)] * np.prod(DA[1:(row+2), :-(row+1)], 0)
+                    # dan = an[0:-(row+1)] * np.prod(DA[1:(row+2), :-(row+1)], 0)
+                    dan = an[0:-(row+1)] * dlda_prod[row+1, :-(row+1)]
                 else:
                     # Apply successived derivative of the parial Char pol
-                    dan = an[slice(0, deg-row)] * np.prod(DA[0:(row+1), slice(0, deg-row)], 0)
+                    # dan = an[slice(0, deg-row)] * np.prod(DA[0:(row+1), slice(0, deg-row)], 0)
+                    dan = an[slice(0, deg-row)] * dlda_prod[row, slice(0, deg-row)]
                     # np.polyval start by high degree
                     # np.polynomial.polynomial.polyval start by low degree!!!
                 # J[row, col] = polyval(lda, dan[::-1])
