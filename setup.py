@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 import setuptools
-import os
+# Usefull to build f90 files
+from numpy.distutils.core import Extension, setup
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+# Define f90 module to include
+ext_fpoly = Extension(name='eastereig.fpoly.fpolyval',
+                      sources=['eastereig/fpoly/fpolyval.f90'])
 
 def _getversion():
     """ Get version from VERSION."""
@@ -20,7 +24,7 @@ def _getversion():
 this_version = _getversion()
 print('version:', this_version)
 
-setuptools.setup(
+setup(
     name="eastereig",
     version=this_version,
     author="B. Nennig, M. Ghienne",
@@ -32,6 +36,8 @@ setuptools.setup(
     include_package_data=True,
     # we can use find_packages() to automatically discover all subpackages
     packages=setuptools.find_packages(),
+    # build f90 module
+    ext_modules=[ext_fpoly],
     install_requires=['numpy',
                       'scipy',
                       'matplotlib'],
