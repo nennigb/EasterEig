@@ -17,20 +17,22 @@
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-## Define CharPol class
+# Define CharPol class and auxilliary classes.
 
-This class with handle the *partial * characteristic polynomial.
+This class with handle the **partial characteristic polynomial**.
 This polynomial is built from Vieta formulas and from the successive
 derivatives of the selected set of eigenvalues.
 [Vieta' formulas](https://en.wikipedia.org/wiki/Vieta%27s_formulas)
 
-
-
 """
+
+
 import numpy as np
+from numpy.linalg import norm
 import itertools as it
 from eastereig.eig import AbstractEig
-from eastereig.utils import _outer, diffprodTree, div_factorial
+from eastereig.utils import _outer, diffprodTree, div_factorial, diffprodMV
+# from eastereig import EP
 # TODO is still sympy usefull
 import sympy as sym
 
@@ -50,15 +52,18 @@ class CharPol():
     r""" Numerical representation of the *partial* characteristic polynomial.
 
         This polynomial is built from Vieta formulas and from the successive
-        derivatives of the selected set of eigenvalues.
+        derivatives of the selected set of eigenvalues \(\Lambda\).
 
-        This class allow to reconstruct eigenvalue loci and to locate
-        EP and the associated eigenvalue.
+        This class allows to reconstruct eigenvalue loci and to locate
+        EP between the eigenvalues from the set.
 
-        This polynomial can be seen as a polynomial in lambda, whom coefficients
-        are Taylor series in \(\nu_0, ..., \nu_m \)
+        This polynomial can be seen as a polynomial in \(\lambda\), whom coefficients \(a_n\\)
+        are Taylor series in \(\nu_0, ..., \nu_m \). For instance with 3 coefficients, the
+        attribut `dcoef[n]` represents the array \((a_n)_{i,j,k}\)
+        $$a_n(\nu_0, \nu_1, \nu_2) = \sum_{i,j,k} (a_n)_{i,j,k}  \nu_0^i  \nu_1^j  \nu_2^k$$
 
-        dcoef : p(nu_0, nu_1, nu_2) = \\sum_{i,j,k} a_{i,j,k} * nu_0^i * nu_1^j * nu_2^k
+        The partial characteristic polynomial reads
+        $$ p = \sum \lambda^{n-1} a_{n-1}(\boldsymbol\nu)  + ... + a_0(\boldsymbol\nu)$$
 
     """
 
@@ -69,7 +74,11 @@ class CharPol():
 
         if isinstance(dLambda[0], np.ndarray):
             self.dLambda = dLambda
-            self.nu0 = nu0
+            if nu0 is not None:
+                self.nu0 = nu0
+            else:
+                ValueError('If initialized by a list of array, nu0 is mandatory.')
+
         elif isinstance(dLambda[0], AbstractEig):
             self.dLambda = [vp.dlda for vp in dLambda]
             self.nu0 = dLambda[0].nu0
@@ -217,8 +226,8 @@ class CharPol():
 
         Attributes
         ----------
-        _dlda_prod : np.array 
-            Coefficients used in 1D (lda) polynomial derivative.
+        _dlda_prod : np.array
+            Coefficients used in 1D (lda) polynomial derivative. Assume decending order.
         _der_coef : np.array
             Coefficients used in ND (nu_0, ..., nu_N) polynomial derivative.
         _da_slice : np.array
@@ -372,6 +381,30 @@ class CharPol():
         """
         # Extract input value
         lda, *nu = vals
+        # Evaluate the polynomial *coefficient* at nu
+        an = self._eval_an_at(nu)
+        # Evaluate the polynomial
+        # np.polyval start by high degree
+        # np.polynomial.polynomial.polyval start by low degree!!!
+        return polyvalnd(lda, an[::-1])
+
+    def _eval_an_at(self, nu):
+        """ Evaluate the partial caracteristic polynomial coefficient an at nu.
+
+        Parameters
+        ----------
+        nu : iterable
+            Containts the value of (nu_0, ..., nu_n) where the polynom
+            must be evaluated. Althought nu is relative to nu0, absolute value
+            have to be used.
+
+        Returns
+        -------
+        an : array
+            The partial caracteristic polynomial coefficient at nu in descending order
+            an[0] * lda **(n-1) + ... + an[n-1]
+        """
+        # Extract input value
         nu = np.array(nu, dtype=np.complex) - np.array(self.nu0, dtype=np.complex)
         an = np.zeros((len(self.dcoefs),), dtype=np.complex)
         # Compute a_n at nu
@@ -381,7 +414,8 @@ class CharPol():
 
         # np.polyval start by high degree
         # np.polynomial.polynomial.polyval start by low degree!!!
-        return polyvalnd(lda, an[::-1])
+        return an
+
 
     @staticmethod
     def _newton(f, J, x0, tol=1e-8, normalized=True, verbose=False):
@@ -402,13 +436,13 @@ class CharPol():
             If `True` the tol is applied to the ratio of the ||f(x)||/||f(x0)||
         verbose : bool
             print iteration log.
-            
+
 
         Returns
         -------
         x : array
             The solution or None of NiterMax has been reach or if the
-            computation fail. 
+            computation fail.
         """
 
         # set max iteration number
@@ -701,8 +735,199 @@ class CharPol():
                 sol = CharPol._rec_solve(gi, variables, nui, sol)
         return sol
 
-    def discriminant(self):
-        pass
+    def getdH(self):
+        r""" Compute the Taylor series of H function with respect to nu.
+        
+        H is proportional to the discriminant of the partial characteristic polynomial.
+
+        This method provides Taylor series of Discriminant, whereas the `discriminant`
+        method, using the Sylvester matrix, just provides an evaluation at fixed
+        nu values.
+        This Taylor series may be particularly usefull when dealing with univariate
+        polynomial to find all the roots.
+
+        This _discriminant_ estimation is obtained from the eigenvalues (roots of the CharPol),
+        $$
+        H(\nu) = \prod_{i<j} (\lambda_i(\nu)-\lambda_j(\nu))^2.
+        $$
+        this expression can be obtained, seeing that
+        $$
+        H(\nu) = \prod_{p \in P} h_{p}(\nu)
+        $$
+        Here, we called \(P\) the set of all possible pair of eigenvalues from the set of the
+        selected eigenvalue \(\Lambda\).
+
+
+        Returns
+        -------
+        TH : list
+            Contains the Taylor series of H.
+
+        Remarks
+        -------
+        H is equal to the discriminant iff an=1, else need to multiply by an**(2*n -2).
+        """
+
+        dLambda = self.dLambda
+
+        # assume all dLambda have the same shape
+        N = np.array(dLambda[0].shape) - 1     # Number of derivative
+        M = len(dLambda)                       # M number of eigenvalue in the set
+        # Card of permution of 2 in M element
+        # CM = int(sp.special.binom(M, 2))
+        lda_id = np.arange(0, M)
+
+        Index = []
+        # size CM, contains derivative h(i pair)
+        dh = []
+        # Get all combinaison of eigenvalue and compute dh(i pair)
+        for i in it.combinations(lda_id, 2):
+            # strore index for later use
+            Index.append(i)
+            # Compute the values of dh for a pair :
+            # f = (lda0 -  lda1)**2 = (lda0 -  lda1) * (lda0 -  lda1)
+            f = dLambda[i[0]].squeeze() - dLambda[i[1]].squeeze()
+            dh_ = diffprodMV([f, f], N)
+            # use dedicated formulas for 1 variable, (less sumation)
+            # dh_ = EP.dlda2dh(dLambda[i[0]].squeeze(),
+            #                  dLambda[i[1]].squeeze())
+            dh.append(dh_)
+
+        # Derivate the product of h_i
+        dH = diffprodTree(dh, N)
+        # dH is the successive derivative, div by factorial to get TH
+        TH = Taylor(div_factorial(dH), self.nu0)
+        return TH
+
+    def discriminant(self, nu):
+        r""" Compute the discriminant from the coefficient and the Sylvester matrix.
+
+
+        If we consider a polynom p, with coefficients an, the discriminant is given
+        $$
+        Disc_{x}(p)={\frac {(-1)^{n(n-1)/2}}{a_{n}}}\operatorname {Res}_{x}(p,p')
+                   = \frac {(-1)^{n(n-1)/2}}{a_{n}} \det S
+        $$ where S is the sylvester matrice.
+
+        Parameters
+        ----------
+        nu : iterable
+            Contains the value (nu_0, nu_1, ...) where the discriminant is computed
+
+        Returns
+        -------
+        d : complex
+        """
+        # polynomial coef
+        an = self._eval_an_at(nu)
+        n = an.size - 1
+        dan = an[:-1] * self._dlda_prod[1, :-1]
+        # Sylvester need ascending order
+        S = self.sylvester(an[::-1], dan[::-1])
+        # S = self.sylvester(an, dan)
+        d = np.linalg.det(S) * (-1)**(n * (n-1)/2) * an[0]
+        return d
+
+    @staticmethod
+    def sylvester(p, q):
+        r""" Compute the Sylvester matrix associated to p and q.
+
+        https://en.wikipedia.org/wiki/Sylvester_matrix
+        Formally, let p and q be two nonzero polynomials, respectively of degree m and n, such
+        $$p(z) = p_0 + p_1 z + p_2 z^2 + \cdots + p_m z^m,$$
+        $$q(z) = q_0 + q_1 z + q_2 z^2 + \cdots + q_n z^n.$$
+
+        If the two polynomials have a (non constant) common factor. In such a case, the
+        determinant of the associated Sylvester matrix, also called the resultant of
+        the two polynomials vanishes. If q = dp / dz, the determinant of the Sylvester
+        matrix is the discriminant.
+
+        The Sylvester matrix associated to p and q is (n + m) × (n + m) is build
+        on coefficients shift as shown in the example below.
+
+        Parameters
+        ----------
+        p : array
+            The coefficient of the polynomial p, sorted in ascending order.
+        q : array
+            The coefficient of the polynomial q, sorted in ascending order.
+
+        Returns
+        -------
+        S : array
+            Containing the Sylvester matrix (complex)
+
+        Examples
+        --------
+        p = p = (z-2)**2*(z-3), with a double roots 2
+        >>> p = np.array([-12, 16, -7, 1])
+        >>> q = np.array([16, -14, 3])
+        >>> CharPol.sylvester(p, q).real
+        array([[  1.,  -7.,  16., -12.,   0.],
+               [  0.,   1.,  -7.,  16., -12.],
+               [  3., -14.,  16.,   0.,   0.],
+               [  0.,   3., -14.,  16.,   0.],
+               [  0.,   0.,   3., -14.,  16.]])
+        >>> np.abs(np.linalg.det(CharPol.sylvester(q, p))) < 1e-12
+        True
+
+        """
+        m = p.size
+        n = q.size
+        # size of the Symvester matrix
+        N = m + n - 2
+        S = np.zeros((N, N), dtype=np.complex)
+        # if q has higher degree, need to swap them
+        if n > m:
+            p, q = q, p
+            m, n = n, m
+        # fill upper part with p coefficients
+        for i in range(0, n - 1):
+            S[i, i:(i+m)] = p[::-1]
+        # fill lower part with q coefficients
+        for i in range(0, m - 1):
+            S[i+n-1, i:(i+n)] = q[::-1]
+
+        return S
+
+
+
+class Taylor:
+    """ Define a multivariate Taylor series.
+    """
+
+    def __init__(self, an, nu0):
+        """ Initialize the object with df/d nu divided by factorial.
+        """
+        self.an = an
+        self.nu0 = nu0
+
+    def __repr__(self):
+        """ Define the representation of the class
+        """
+        return "Instance of {} @nu0={} with #{} derivatives.".format(self.__class__.__name__,
+                                                                     self.nu0,
+                                                                     self.an.shape)
+
+    def eval_at(self, nu):
+        """ Evaluate the Taylor series at nu with derivatives computed at nu0.
+
+        Parameters
+        ----------
+        nu : iterable
+            Containts the value of (nu_0, ..., nu_n) where the polynom
+            must be evaluated. Althought nu is relative to nu0, absolute value
+            have to be used.
+
+        Returns
+        -------
+        The evaluation of the Taylor series at nu.
+        """
+        # Extract input value
+        nu = np.array(nu, dtype=np.complex) - np.array(self.nu0, dtype=np.complex)
+        # Evaluate the polynomial
+        return polyvalnd(nu, self.an)
+
 
     # def myroots(coef):
     #     """Provide a global interface for roots of polynom with variable coefficients.
@@ -878,23 +1103,18 @@ class CharPol():
     #     return r
 
 
+
+
 # %% Main for basic tests
 if __name__ == '__main__':
     # run doctest Examples
-    # import doctest
-    # doctest.testmod()
-    x, y, z = sym.symbols('x, y, z')
-    F = [sym.Poly(x**2 + y + z - 1, x, y, z, domain='CC'),
-         sym.Poly(x + y**2 + z - 1, x,y,z, domain='CC'),
-         sym.Poly(x + y + z**2 - 1, x,y,z, domain='CC')]
-    g = sym.groebner(F, method='f5b', domain='CC')
-    sol = CharPol._rec_solve(g, [x, y, z])
-
-    # check solutions
-    for s in sol:
-        x_, y_, z_ = s
-        f_ = []
-        for f in F:
-            f_.append(abs(sym.N(f.subs({x: x_, y: y_, z: z_}))))
-        print(np.sum(f_) < 1e-10, '  ',f_, s, '\n')
-
+    import doctest
+    doctest.testmod()
+    p = np.array([-12, 16, -7, 1])
+    q = np.array([16, -14, 3])
+    S = CharPol.sylvester(p, q)
+    # """[[1, -7, 16, -12, 0],
+    #     [0, 1, -7, 16, -12],
+    #     [3, -14, 16, 0, 0],
+    #     [0, 3, -14, 16, 0],
+    #     [0, 0, 3, -14, 16]]"""
