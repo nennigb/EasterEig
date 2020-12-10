@@ -81,7 +81,12 @@ class CharPol():
 
         elif isinstance(dLambda[0], AbstractEig):
             self.dLambda = [vp.dlda for vp in dLambda]
-            self.nu0 = dLambda[0].nu0
+            try:
+                # this attribute is created in `getDerivative*` method.
+                # check for it are handle error.
+                self.nu0 = dLambda[0].nu0
+            except:
+                raise ValueError('Need to call `getDerivative*` before init a CharPol instance.')
         else:
             TypeError('Unsupported type for dLambda elements.')
 
@@ -826,7 +831,65 @@ class CharPol():
         S = self.sylvester(an[::-1], dan[::-1])
         # S = self.sylvester(an, dan)
         d = np.linalg.det(S) * (-1)**(n * (n-1)/2) * an[0]
+
         return d
+
+    def disc_EP_system(self, nu):
+        r""" Evaluate the successive discriminant to locate higher order EP.
+
+        The resultant, build as the determinant of the Sylvester matrix
+        allows to check if two polynomials share roots. The following
+        system can be used to check if an eigenvalue is common to the
+        characteristic polynomial and its derivative with respect to \(\lambda\).
+        In this case, it is equivalent to find the value \(\boldsymbol \nu\)
+        where the discrimiant vanishes. This is the necessary condition to have
+        an EP2.
+        Applying this recursively, this yields to the following system,
+        $$
+        \begin{pmatrix}
+        \mathrm{Res}_\lambda \big(p(\lambda; \boldsymbol \nu), \partial_\lambda p(\lambda; \boldsymbol \nu)\big) \\
+        \mathrm{Res}_\lambda \big(\partial_{\lambda}p(\lambda; \boldsymbol \nu), \partial_{\lambda\lambda} p(\lambda; \boldsymbol \nu)\big) \\
+        \vdots
+        \end{pmatrix}
+        $$
+        By solving it, we can find \(\boldsymbol \nu\) leading to higher order EP.
+        The number of line is equal to #nu.
+        
+        Parameters
+        ----------
+        vals : iterable
+            Containts the value of (lda, nu_0, ..., nu_n) where the polynom
+            must be evaluated. Althought nu is relative to nu0, absolute value
+            have to be used.
+
+        Returns
+        -------
+        v : np.array
+            Value of the vectorial function @ nu
+
+        Remarks
+        -------
+        This system is an alternative to `EP_system` based on the roots of the
+        characteristic polynomial and its derivatives leading to \(\lambda, \boldsymbol \nu\).
+        The discriminant allows to eliminate \(\lambda\) (or another variable).
+        """
+        # Compute the polynomial coef
+        an = self._eval_an_at(nu)
+        n = an.size - 1
+        # Initialize output v
+        v = np.zeros((len(self.dcoefs[0].shape),), dtype=np.complex)
+        for i, vi in enumerate(v):
+            if i==0:
+                p = an
+            else:
+                p = an[:-(i)] * self._dlda_prod[i, :-i]
+            q = an[:-(1+i)] * self._dlda_prod[(1+i), :-(1+i)]
+            # Sylvester need ascending order
+            S = self.sylvester(p[::-1], q[::-1])
+            # S = self.sylvester(an, dan)
+            ni = n - i
+            v[i] = np.linalg.det(S) * (-1)**(ni * (ni-1)/2) * p[0]
+        return v
 
     @staticmethod
     def sylvester(p, q):
