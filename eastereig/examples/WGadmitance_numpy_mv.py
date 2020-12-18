@@ -65,7 +65,7 @@ from scipy.special import factorial
 import matplotlib.pyplot as plt
 # eastereig
 import eastereig as ee
-
+import sympy as sym
 
 class Ynumpy(ee.OPmv):
     """Create a subclass of the interface class OP that describe the problem operator."""
@@ -262,84 +262,159 @@ class Ynumpy(ee.OPmv):
 
 
 # def main(N=5):
+if __name__ == '__main__':
+    import eastereig as ee
+    from sympy.solvers.polysys import solve_generic
+    import numpy as np
+    np.set_printoptions(linewidth=150)
+    """ run the example
+    
+    Parameters
+    -----------
+    N : integer
+        number of degree of freedom
+    
+    Returns
+    -------
+    EP1 : EP
+        The EP object containing all EP information
+    vp1 : Eig
+        The object containing all information on the 1st eigenvalue
+    """
+    N = 50
+    pi = np.pi
+    # Number of derivative
+    Nderiv = (14, 14)
+    # wavenumer and air properties
+    rho0, c0, k0 = 1., 1., 1.
+    # duct height
+    h = 1.
+    # initial imepdance guess
+    # nu0 = [3.0 + 3j, 3.0 + 3.0j]
+    # nu0 = [0.0+0.00j, 0.]
+    nu0_manu = np.array([3.1781+ 4.6751j, 3.0875 + 3.6234j])
+    # nu0 = 1.5*nu0_manu/1j
+    nu0 = (0j, 0j)
+    
+    # number of dof
+    # N=5 -> move to function
+    
+    # number of mode to compute
+    Nmodes = 6
+
+    # Create discrete operator of the pb
+    imp = Ynumpy(y=nu0, n=N, h=h, rho=rho0, c=c0, k=k0)
+    print(imp)
+    # Initialize eigenvalue solver for *generalized eigenvalue problem*
+    imp.createSolver(pb_type='gen')
+    # run the eigenvalue computation
+    Lambda = imp.solver.solve(nev=Nmodes, target=0+0j, skipsym=False)
+    # create a list of the eigenvalue to monitor
+    lda_list = np.arange(0, Nmodes)
+    # return the eigenvalue and eigenvector in a list of Eig object
+    extracted = imp.solver.extract(lda_list)
+    # destroy solver (important for petsc/slepc)
+    imp.solver.destroy()
+    print('> Eigenvalue :', Lambda)
+    print('> alpha/pi :', np.sqrt(k0 - Lambda)/np.pi)
+    
+    print('> Get eigenvalues derivatives ...\n')
+    for vp in extracted:
+        vp.getDerivativesMV(Nderiv, imp)
+
+    print('Create CharPol...')
+    C = ee.CharPol(extracted)
+    
+    # From analyical solution:
+    alpha_s = 4.1969 - 2.6086j
+    lda_s = k0**2 - alpha_s**2
+    nu_s = np.array((3.1781+ 4.6751j, 3.0875 + 3.6234j))/ 1j
+    
+    val_s = np.array((lda_s, *nu_s))
+    C.eval_at(val_s)
+    
+    val0 = np.array((extracted[0].lda, *nu0))
+    # Locate (lda, EP)
+    # sol = C.newton(((lda_s*0.9, lda_s*4.),
+    #                 (2+2j, 4+8j),
+    #                 (2+2j, 4+8j)), decimals=4, Npts=7)
+    # Best stragety is 1st run coarse and second run to refine.
+    # sort roots by nu_i modulus
+    # expression solution in alpha
+    # sol[:, 0] = np.sqrt(k0**2 - sol[:, 0])
+    # s = C._newton(C.EP_system, C.jacobian, val0, verbose=True)
+    
+    # # sort all solution "by amplitude"
+    # ind = np.argsort(np.sum(np.abs(sol), axis=1))
+    # sol_ = sol[ind, :]
+    # # # print them in reversed order to see the good one at the end
+    # print(sol_[::-1,:])
+    
+        # return imp, sol
+    # have a lookk on coef convergence radius
+    for i, a in enumerate(C.dcoefs):
+        if i>0:
+            r_nu0 = np.roots(a[0, :][::-1])
+            r_nu1 = np.roots(a[:, 0][::-1])
+            plt.plot(r_nu0.real, r_nu0.imag, '+')
+            plt.plot(r_nu1.real, r_nu1.imag, 'x')
+    # if __name__=='__main__':
+    #     """Show graphical outputs and reconstruction examples."""
+    #     imp, sol = main()
+
+    
+    # %% play with Groebner
+    p0, variables = ee.CharPol.taylor2sympyPol(C.dcoefs, tol=1e-5)
+
+    for k,v in p0.as_dict().items():
+        print(k, v)
+    groeb = False
+    if groeb:
+        F = [p0, p0.diff(variables[0]), p0.diff(variables[0], 2)]
+        g = sym.groebner(F, method='f5b', domain='CC')
+
+    # %% directionnal convergence
+    # def radii(a):
+    #     """ compute the radii of convergence.
+    #     reduce to a 1D series, by putting mu = exp(1i phi)
+    #     """
+    #     Ndir = 10
+    #     Phi = np.linspace(0, pi/2, Ndir)
+    #     rho = np.zeros_like(Phi)
+    #     Rho = []
+    #     for phi in Phi:
+    #         alp = np.tan(phi)
+    #         cn = np.zeros(a.shape[1], dtype=np.complex) + 1e-15
+    #         for n in range(0, a.shape[1]):
+    #             for m in range(0, a.shape[0]):
+    #                 cn[n] += a[m, n] * (alp**m)
+    #         rho = 1/(np.abs(cn) ** ( - 1 / np.arange(0, a.shape[1])))
+    #         Rho.append(rho)
+    #     return Rho
+
+    def radii_fit(a):
+        """ LMS fit to find radii of convergence.
+        """
+        alp1, alp2 = np.meshgrid(np.arange(0, a.shape[0]),
+                                 np.arange(0, a.shape[1]))
+
+        alp = alp1 + alp2 +0.001
+        expo = 1 / (alp)
+        expo[0, 0] = 0
+        d = np.power(np.abs(a), expo)
+        print(1/d)
+
+        V = np.hstack( (-alp1.reshape(-1, 1) / alp.reshape(-1,1), -alp2.reshape(-1, 1)/ alp.reshape(-1,1)))
+        x, y = np.linalg.pinv(V) @ np.log(d.reshape(-1, 1))
+
+        return np.exp(x), np.exp(y)
 
 
-""" run the example
 
-Parameters
------------
-N : integer
-    number of degree of freedom
+    r = radii(C.dcoefs[2])
+    x, y =radii_fit(C.dcoefs[2])
 
-Returns
--------
-EP1 : EP
-    The EP object containing all EP information
-vp1 : Eig
-    The object containing all information on the 1st eigenvalue
-"""
-N = 100
-pi = np.pi
-# Number of derivative
-Nderiv = (4, 4)
-# wavenumer and air properties
-rho0, c0, k0 = 1., 1., 1.
-# duct height
-h = 1.
-# initial imepdance guess
-# nu0 = [3.0 + 3j, 3.0 + 3.0j]
-# nu0 = [0.0+0.00j, 0.]
-nu0_manu = np.array([3.1781+ 4.6751j, 3.0875 + 3.6234j])
-nu0 = 1.5*nu0_manu/1j
 
-# number of dof
-# N=5 -> move to function
-
-# number of mode to compute
-Nmodes = 5
-
-# Create discrete operator of the pb
-imp = Ynumpy(y=nu0, n=N, h=h, rho=rho0, c=c0, k=k0)
-print(imp)
-# Initialize eigenvalue solver for *generalized eigenvalue problem*
-imp.createSolver(pb_type='gen')
-# run the eigenvalue computation
-Lambda = imp.solver.solve(nev=Nmodes, target=0+0j, skipsym=False)
-# create a list of the eigenvalue to monitor
-lda_list = np.arange(0, 12)
-# return the eigenvalue and eigenvector in a list of Eig object
-extracted = imp.solver.extract(lda_list)
-# destroy solver (important for petsc/slepc)
-imp.solver.destroy()
-print('> Eigenvalue :', Lambda)
-print('> alpha/pi :', np.sqrt(k0 - Lambda)/np.pi)
-
-print('> Get eigenvalues derivatives ...\n')
-for vp in extracted:
-    vp.getDerivativesMV(Nderiv, imp)
-
-C = ee.CharPol(extracted)
-
-# From analyical solution:
-alpha_s = 4.1969 - 2.6086j
-lda_s = k0**2 - alpha_s**2
-nu_s = np.array((3.1781+ 4.6751j, 3.0875 + 3.6234j))/ 1j
-
-val_s = np.array((lda_s, *nu_s))
-C.eval_at(val_s)
-
-val0 = np.array((extracted[0].lda, *nu0))
-# Locate (lda, EP)
-sol = C.newton(((lda_s*0.9, lda_s*4.),
-                (2+2j, 4+8j),
-                (2+2j, 4+8j)), decimals=3, tol=1e-6, Npts=7)
-# Best stragety is 1st run coarse and second run to refine.
-# sort roots by nu_i modulus
-# expression solution in alpha
-sol[:,0] = np.sqrt(k0**2 - sol[:,0])
-s = C._newton(C.EP_system, C.jacobian, val0, tol=1e-4, verbose=True)
-    # return imp, sol
-
-# if __name__=='__main__':
-#     """Show graphical outputs and reconstruction examples."""
-#     imp, sol = main()
+    # NewOption = sym.Options(g.gens, {'domain': 'CC'})
+    # # sol = _solve_reduced_system2(F, F[0].gens)
+    # sol_sympy = solve_generic(g, NewOption)
