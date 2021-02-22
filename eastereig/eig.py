@@ -704,12 +704,16 @@ class NumpyEig(AbstractEig):
             v = np.ones(shape=self.x.shape)
             # see also VecScale
             scale = (1/v.dot(self.x))
-            if np.abs(scale) < 1e6:
+            if np.abs(scale) < 1e6:  # TODO this tol is arbitrary
                 self.x *= scale
             else:
-                print('Warning : x is nearly co-linear to v. Use random vector for v...')
-                v = np.random.rand(*self.x.shape)
-                self.x *= (1/v.dot(self.x))
+                print('Warning : v is nearly co-linear to x (|scale|={}). Use random vector for v.'.format(abs(scale)))
+                # Test (possibily) several random vector
+                while np.abs(scale) > 1e2:  # TODO this tol is arbitrary
+                    v = np.random.rand(*self.x.shape)
+                    scale = (1/v.dot(self.x))
+                    print('          new scale is {}'.format(abs(scale)))
+                self.x *= scale
 
             # Create an empty array of object
             self.dx = np.empty(N, dtype=object)
