@@ -35,6 +35,7 @@ from eastereig.utils import _outer, diffprodTree, div_factorial, diffprodMV
 # from eastereig import EP
 # TODO is still sympy usefull
 import sympy as sym
+import scipy.linalg as spl
 
 # // evaluation in newton method
 import concurrent.futures
@@ -98,12 +99,28 @@ class CharPol():
         # Compute usefull coefficients for jacobian evaluation
         self._jacobian_utils()
 
+        # How many eig in the charpol
+        self.N = len(self.dcoefs) - 1
+
     def __repr__(self):
         """ Define the representation of the class
         """
-        return "Instance of {}  @nu0={} with #{} derivatives.".format(self.__class__.__name__,
+        return "Instance of {}  @nu0={} with #{} derivatives and #{} eig..".format(self.__class__.__name__,
                                                                       self.nu0,
-                                                                      self.dLambda[0].shape)
+                                                                      self.dLambda[0].shape,
+                                                                      self.N)
+
+    def lda(self):
+        """ Return the eigenvalue value used in the CharPol.
+        """
+        Lda = np.array([lda.flat[0] for lda in self.dLambda])
+        return Lda
+
+    def coef0(self):
+        """ Return the coefficient of the CharPol @ nu0.
+        """
+        an = np.array([dcoef.flat[0] for dcoef in self.dcoefs])
+        return an
 
     @staticmethod
     def vieta(dLambda):
@@ -810,9 +827,9 @@ class CharPol():
 
         If we consider a polynom p, with coefficients an, the discriminant is given
         $$
-        Disc_{x}(p)={\frac {(-1)^{n(n-1)/2}}{a_{n}}}\operatorname {Res}_{x}(p,p')
+        \operatorname Disc_{x}(p)={\frac {(-1)^{n(n-1)/2}}{a_{n}}}\operatorname {Res}_{x}(p,p')
                    = \frac {(-1)^{n(n-1)/2}}{a_{n}} \det S
-        $$ where S is the sylvester matrice.
+        $$ where S is the `sylvester` matrix.
 
         Parameters
         ----------
@@ -830,8 +847,10 @@ class CharPol():
         # Sylvester need ascending order
         S = self.sylvester(an[::-1], dan[::-1])
         # S = self.sylvester(an, dan)
-        d = np.linalg.det(S) * (-1)**(n * (n-1)/2) * an[0]
-
+        d = spl.det(S) * (-1)**(n * (n-1)/2) * an[0]
+        print(np.linalg.cond(S))
+        Q, R = spl.qr(S)
+        print('QR :', np.prod(np.diag(R)))
         return d
 
     def disc_EP_system(self, nu):
