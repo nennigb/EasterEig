@@ -21,10 +21,11 @@
 import numpy as np
 from numpy import zeros, asarray, eye, poly1d, hstack, r_
 from scipy import linalg
-from scipy.special import factorial
-import itertools  as it
-from collections import deque
+from scipy.special import factorial, binom
+import itertools as it
+from collections import deque, namedtuple
 from functools import reduce
+
 
 def multinomial_index_coefficients(m, n):
     r"""Return a tuple containing pairs ``((k1,k2,..,km) , C_kn)``
@@ -498,6 +499,187 @@ def pade(an, m, n=None):
     q = r_[1.0, pq[n+1:]]
     return poly1d(p[::-1]), poly1d(q[::-1])
 
+
+# Define named tupled to manipulate Bell polynomials
+Bell = namedtuple('Bell', 'len coef pow')
+
+def _partialBellPoly(N, K):
+    r""" Compute partial Bell polynomials.
+
+    These polynomials appear in the computation of derivatives of composite function.
+
+    The exponential Bell polynomial encodes the information related to the
+    ways a set of N can be partitioned in K subsets.
+
+    The partial Bell polynomials are computed by a recursion relation
+    (https://en.wikipedia.org/wiki/Bell_polynomials#Recurrence_relations) :
+    $$ B_{n,k}=\sum _{i=1}^{n-k+1}{\binom {n-1}{i-1}}x_{i}B_{n-i,k-1} $$
+    where \( B_{0,0}=1\), \( B_{n,0}=0\;\mathrm {for} \;n\geq 1\) and
+    \(B_{0,k}=0\;\mathrm {for} \;k\geq 1.\)
+
+    Parameters
+    ----------
+    N : int
+        Set size.
+    K : int
+        subset size.
+
+    Returns
+    -------
+    B : array
+        return all the partial Bell polynomial. Each polynomial is represented as a named-tuple,
+        with len, pow and coef field. `coef[i]` constains the coefficient of the i-thmonomial
+        and `pow[i]` contains the expononent of each symbolic variable `x_i`
+        (see below in the example).
+
+    Examples
+    --------
+    For instance, to compute
+    $$ B_{6,3}(x_{1},x_{2},x_{3},x_{4})= 15x_{4}x_{1}^{2}+60x_{3}x_{2}x_{1}+15x_{2}^{3} $$
+    >>> B = _partialBellPoly(6, 3)
+    >>> B[6, 3]  # doctest: +NORMALIZE_WHITESPACE
+    Bell(len=3,
+         coef=array([15, 60, 15], dtype=int32),
+         pow=array([[0, 3, 0, 0, 0, 0],
+                    [1, 1, 1, 0, 0, 0],
+                    [2, 0, 0, 1, 0, 0]], dtype=int32))
+
+    Alternativelly, such number can be computed in sympy, using
+    `bell(6, 3, symbols('x:6')[1:])`. It means there are :
+      * 15 ways to partition a set of 6 as 4 + 1 + 1, -> x4 x1**2
+      * 60 ways to partition a set of 6 as 3 + 2 + 1, and -> x3 x2 x1
+      * 15 ways to partition a set of 6 as 2 + 2 + 2.   -> x2**3
+
+    \[B_{6,2} = 6 x_{1} x_{5} + 15 x_{2} x_{4} + 10 x_{3}^{2}￼ \]
+    >>> B[6, 2]  # doctest: +NORMALIZE_WHITESPACE
+    Bell(len=3,
+         coef=array([10, 15,  6], dtype=int32),
+         pow=array([[0, 0, 2, 0, 0, 0],
+                    [0, 1, 0, 1, 0, 0],
+                    [1, 0, 0, 0, 1, 0]], dtype=int32))
+    """
+
+    # Init output results
+    B = np.empty((N+1, N+1), dtype=np.object)
+
+    # Create 0 bell polynomials
+    b0 = Bell(0, np.array([0]), np.zeros((1, N), dtype=np.int32))
+    # Recursive building
+    for n in range(0, N+1):
+        for k in range(0, n+1):
+            if (k == 0) and (n == 0):
+                # B[0, 0] = 1
+                B[0, 0] = Bell(1, np.array([1]), np.zeros((1, N), dtype=np.int32))
+            elif ((k >= 1) and (n == 0)) or ((n >= 1) and (k == 0)):
+                # case k==0, fill with b0
+                B[n, k] = b0
+            else:
+                # Compute B(n,k)
+                # Inititalize temp field
+                coef = []
+                Pow = []
+                for i in range(1, n-k+2):
+                    c = binom(n-1, i-1)
+                    # may contains several terms
+                    for j in range(1, B[n-i, k-1].len + 1):
+                        # multiply with binomial coef
+                        coef_ = B[n-i, k-1].coef[j-1]*c
+                        pow_ = B[n-i, k-1].pow[j-1].copy()
+                        # shift power
+                        pow_[i-1] = pow_[i-1] + 1
+                        # store them
+                        Pow.append(pow_)
+                        coef.append(coef_)
+
+                # Find polynomials that appear several time, and sum there coeff
+                # powu = pow(ic), ic previous size, but with new index
+                powu, ia, ic = np.unique(Pow, axis=0, return_index=True, return_inverse=True)
+                coefu = np.zeros(ia.size, dtype=np.int32)
+                for j in range(0, len(coef)):
+                    coefu[ic[j]] = coef[j] + coefu[ic[j]]
+
+                # Store the new polynomial as Bell object
+                B[n, k] = Bell(len(coefu), coefu, powu)
+
+    return B
+
+
+def faaDiBruno(df, dg, N=None):
+    r""" Compute the successive derivative of a composite function with
+    Faa Di Bruno formula.
+
+    Expressed in terms of Bell polynomials Bn,k(x1,...,xn−k+1), this yields 
+    \[ d^{n} \over dx^{n}}f(g(x))=\sum _{k=1}^{n}f^{(k)}(g(x))\cdot B_{n,k}\left(g'(x),g''(x),\dots ,g^{(n-k+1)}(x)\right). \]
+    see https://en.wikipedia.org/wiki/Fa%C3%A0_di_Bruno's_formula
+
+    Parameters
+    ----------
+    df : array
+        value of df/dg computed at x0. By convention, df[0] is the function value 
+        (not the derivatives).
+    dg : array
+        values of dg/dx computed at x0. By convention, dg[0] is the function value
+        (not the derivatives).
+    N : int, optional
+        The requested number of derivatives if less than `len(df)`
+    
+    Returns
+    -------
+    dfog : array
+        Values of the successive derivative of the composite function. `len(dfog)` is N+1
+        or `len(df)`.
+
+    Examples
+    --------
+    Compute the 4 first derivatives of the composite function exp(x)**2 at x=1.
+    Let be f = g**2 and g(x) = exp(x).
+    Define `df` the successive derivative of f with respect to g.
+    Define `dg` the (constant) successive derivative of g with respect to x.
+    >>> ref = np.array([7.38905609893065, 14.7781121978613, 29.5562243957226, 59.1124487914452, 118.224897582890])
+    >>> x = 1.
+    >>> dg = np.repeat(np.exp(x), 5)
+    >>> df = np.array([np.exp(x)**2, 2*np.exp(x), 2, 0, 0])
+    >>> dfog = faaDiBruno(df, dg)
+    >>> np.linalg.norm(dfog - ref) < 1e-12
+    True
+
+    Compute the first derivatives of the composite function (x**3)**2 @ x=2
+    >>> x = 2.
+    >>> dg = np.array([x**3, 3*x**2, 6*x, 6, 0, 0, 0])
+    >>> df = np.array([dg[0]**2, 2*dg[0], 2, 0, 0, 0, 0])
+    >>> dfog = faaDiBruno(df, dg)
+    >>> ref = np.array([64.0, 192.0, 480.0, 960.0, 1440.0, 1440.0, 720.0])
+    >>> np.linalg.norm(dfog - ref) < 1e-12
+    True
+    """
+    # Get the maximal number of available derivatives
+    if (N is None):
+        N = len(df) - 1
+    # Get the maximal number of df non vanishing terms,
+    # Remove trailling 0 to speed up loop.
+    kmax = np.flatnonzero(df)[-1] + 1
+    # Compute required Bell polynomials
+    B = _partialBellPoly(N, kmax)
+    # Compute the derivative up to N
+    dfog = []
+    for n in range(0, N+1):
+        if n == 0:
+            dfog.append(df[0])
+        else:
+            # init Bell polynomial storage variable
+            dfog_ = 0j
+            # Sum until df has trailling zeros
+            for k, dfk in enumerate(df[0:min(n+1, kmax)]):
+                if k > 0:
+                    s = 0j
+                    for i, c in enumerate(B[n, k].coef):
+                        s += c * np.prod(np.power(dg[1:(n-k+2)],
+                                                  B[n, k].pow[i][0:(n-k+1)]))
+                    # multipy by the function f derivatives
+                    dfog_ += dfk * s
+            dfog.append(dfog_)
+
+    return dfog
 # %% Main for basic tests
 if __name__ == '__main__':
     # run doctest Examples
