@@ -261,8 +261,46 @@ class Ynumpy(ee.OPmv):
             return 0
 
 
+def convert2polsys(p0):
+    """ First attempt to export the system to polsys, based on sympy.
+
+    N = 2
+    n_coef_per_eq = np.array([6, 6], dtype=np.integer)
+    all_coef = np.array([-9.80e-04, 9.78e+05,  -9.80e+00, -2.35e+02, 8.89e+04, -1.00e+00,
+                         -1.00e-02, -9.84e-01, -2.97e+01,  9.87e-03,-1.24e-01, -2.50e-01], dtype=np.complex)
+    all_deg = np.zeros((np.sum(n_coef_per_eq), N), dtype=np.integer)
+    """
+    # number of variables
+    N = len(p0.gens)
+    P = []
+    # Build formal system
+    for n in range(0, N):
+        P.append(p0.diff((p0.gens[0], n)))
+    coeff_list = []
+    deg_list = []
+
+    # Conversion
+    n_coef_per_eq = np.zeros((N,), dtype=np.integer)
+    for n, p in enumerate(P):
+        pd = p.as_dict()
+        k = 0
+        for key, val in pd.items():
+            coeff_list.append(val)
+            deg_list.append(list(key))
+            k += 1
+        # store the number of terms for this polynomial
+        n_coef_per_eq[n] = k
+
+    all_coef = np.array(coeff_list, dtype=np.complex)
+    all_deg = np.array(deg_list, dtype=np.int)
+
+    return N, n_coef_per_eq, all_coef, all_deg
+
+
 # def main(N=5):
 if __name__ == '__main__':
+    import time
+    import pickle
     import eastereig as ee
     from sympy.solvers.polysys import solve_generic
     import numpy as np
@@ -284,7 +322,7 @@ if __name__ == '__main__':
     N = 50
     pi = np.pi
     # Number of derivative
-    Nderiv = (14, 14)
+    Nderiv = (4, 4)
     # wavenumer and air properties
     rho0, c0, k0 = 1., 1., 1.
     # duct height
@@ -335,9 +373,12 @@ if __name__ == '__main__':
     
     val0 = np.array((extracted[0].lda, *nu0))
     # Locate (lda, EP)
-    # sol = C.newton(((lda_s*0.9, lda_s*4.),
-    #                 (2+2j, 4+8j),
-    #                 (2+2j, 4+8j)), decimals=4, Npts=7)
+    tic = time.time()
+    sol = C.newton(((lda_s*0.9, lda_s*4.),
+                    (2+2j, 4+8j),
+                    (2+2j, 4+8j)), decimals=4, Npts=7)
+    toc = time.time()
+    print('Newton time : ', toc - tic)
     # Best stragety is 1st run coarse and second run to refine.
     # sort roots by nu_i modulus
     # expression solution in alpha
@@ -366,8 +407,14 @@ if __name__ == '__main__':
     # %% play with Groebner
     p0, variables = ee.CharPol.taylor2sympyPol(C.dcoefs, tol=1e-5)
 
-    for k,v in p0.as_dict().items():
-        print(k, v)
+    # Try to solve with polsys
+    out4polsys = convert2polsys(p0)
+    with open('admitance.pkl','wb') as f:
+        pickle.dump(out4polsys, f)
+
+    # for k,v in p0.as_dict().items():
+    #     print(k, v)
+
     groeb = False
     if groeb:
         F = [p0, p0.diff(variables[0]), p0.diff(variables[0], 2)]
@@ -411,8 +458,11 @@ if __name__ == '__main__':
 
 
 
-    r = radii(C.dcoefs[2])
-    x, y =radii_fit(C.dcoefs[2])
+    # r = radii(C.dcoefs[2])
+    for n, a in enumerate(C.dcoefs):
+        if n > 0:
+            x, y =radii_fit(a)
+            print(x,y)
 
 
     # NewOption = sym.Options(g.gens, {'domain': 'CC'})
