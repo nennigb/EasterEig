@@ -105,9 +105,10 @@ class CharPol():
     def __repr__(self):
         """ Define the representation of the class
         """
-        return "Instance of {}  @nu0={} with #{} derivatives and #{} eig..".format(self.__class__.__name__,
+        nd = tuple(np.array(self.dLambda[0].shape) - 1 )
+        return "Instance of {}  @nu0={} with #{} derivatives and #{} eigs..".format(self.__class__.__name__,
                                                                       self.nu0,
-                                                                      self.dLambda[0].shape,
+                                                                      nd,
                                                                       self.N)
 
     def lda(self):
