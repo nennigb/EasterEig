@@ -100,10 +100,16 @@ class AbstractEig(ABC):
     def __repr__(self):
         """ Define the representation of the class
         """
+        # Check if dlda has a 'shape'  (works with np.array)
+        # else use 'len' which works with all iterables...
+        if hasattr(self.dlda, 'shape'):
+            nd = tuple(np.array(self.dlda.shape) - 1)
+        else:
+            nd = len(self.dlda) - 1
 
         return "Instance of {}  @lda={} with #{} derivatives".format(self.__class__.__name__,
                                                                      self.lda,
-                                                                     len(self.dlda))
+                                                                     nd)
 
     @abstractmethod
     def export(self, filename, eigenvec=True):
