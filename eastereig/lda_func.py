@@ -232,10 +232,80 @@ def dLda3(lda):
     return 3.*lda*lda
 
 
+# exp(-tau * lda)
+def ExpLda(k, n, dlda, tau=0.001j):
+    """ Compute the k-th derivative of  `exp(-tau*lda(nu))` with respect to nu
+    using Faa Di Bruno method for composite function.
+
+    This approach is limited to scalar parameter nu.
+
+    **If k==n, the terms containing lda^(n) are skipped**. They dont belong to the RHS computation
+
+    Parameters
+    -----------
+    k : int
+        The requested derivative order of the flda term.
+    n : int
+        The final requested number of derivative of lda.
+    dlda : iterable
+        The value of the eigenvalue derivative.
+    tau : complex
+        A scaling factor.
+
+    Examples
+    ---------
+    Compute the derivatives of exp(-tau*lda(nu)), with \( lda(nu) = nu + nu**2 + 2\) for x=2 and tau = 0.001
+    #                     0                   1                    2                     3                    4
+    >>> valid = np.array([0.992031914837061, -0.00496015957418530, -0.00195926303180320, 2.96369534557572e-5, 1.16073934235404e-5])
+    >>> dlda  = np.array([8, 5, 2, 0, 0, 0])
+    >>> abs(ExpLda(4, 5, dlda, tau=0.001) - valid[4]) < 1e-12
+    True
+
+    Check that for `k==n`, `ExpLda(4, 4, dlda)` the last terms has been removed
+    >>> abs(ExpLda(2, 2, dlda, tau=0.001) - valid[2] - 0.001*ExpLda(0, 2, dlda, tau=0.001)*dlda[2] ) < 1e-12
+    True
+    """
+    # Check that input argument are not iterable (not supported by faa di Bruno)
+    if hasattr(n, '__iter__') or hasattr(k, '__iter__'):
+        raise ValueError('Input argument cannot be an iterable.'
+                         ' This implementation of `Lda3`'
+                         ' cannot handle multivariate case.')
+    # k=0 nothing to do
+    if k == 0:
+        d = np.exp(-tau*dlda[0])
+    # else compute ;-)
+    else:
+        # Create the 'outer' function derivatives        
+        f = np.exp(-tau*dlda[0])
+        df = (-tau)**np.arange(0, len(dlda))*f
+        # Append a 0 in dlda[n] to remove the term containing lda**(n) which is not known
+        # thus not in the RHS
+        if k == n:
+            dlda_ = np.zeros(k + 1, dtype=complex)
+            dlda_[:k] = dlda[:k]
+        else:
+            dlda_ = dlda[:k+1]
+        # Remarks : [:k+1] works even if its bigger than the vector size, it takes all
+        d = faaDiBruno(df[:k+1], dlda_, k)[k]
+
+    return d
+
+
+def dExpLda(lda):
+    """ Compute the 1st derivative of the function exp(-tau*lda) with respect
+    to lda.
+    """
+    # FIXME find a better way to do that...
+    # trick to recover the defaut value of tau in ExpLda
+    tau = ExpLda.__defaults__[0]
+    return -tau*np.exp(-tau*lda)
+
+
 # Mapping between f(lda) -> d_\dlda f(lda)
 _dlda_flda = {Lda: dLda,
               Lda2: dLda2,
               Lda3: dLda3,
+              ExpLda: dExpLda,
               None: lambda x: 0,
               }
 r"""
