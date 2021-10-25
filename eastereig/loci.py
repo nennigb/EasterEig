@@ -52,19 +52,18 @@ class Loci:
             where n_eig is the number of eigenvalue
 
     """
-    def __init__(self,LAMBDA=None,NU=None):
+
+    def __init__(self, LAMBDA=None, NU=None):
+        """ Initialisation with numpy nd array.
         """
-        Initialisation with numpy nd array
-        """
-        #todo add check on LAMDA to be consitent with plotting constaint
+        # Todo add check on LAMDA to be consitent with plotting constaint
         self.LAMBDA = LAMBDA
         self.NU = NU
 
     def __repr__(self):
-       """ Define the object representation
-       """
-       return "Instance of Loci class. Contains {}x{} nu map.".format(*self.NU.shape)
-
+        """ Define the object representation.
+        """
+        return "Instance of Loci class. Contains {}x{} nu map.".format(*self.NU.shape)
 
     @staticmethod
     def reloadLoci(LAMBDAfile):
@@ -75,10 +74,10 @@ class Loci:
         LAMBDAfile: string
             the name of the file to reload
         """
-        npzfile = np.load(LAMBDAfile) #where npzfile is a dict
+        npzfile = np.load(LAMBDAfile)  # where npzfile is a dict
         LAMBDA = npzfile['LAMBDA']
         NU = npzfile['NU']
-        L = Loci(LAMBDA,NU)
+        L = Loci(LAMBDA, NU)
         return L
 
     def export(self, LAMBDAfile):
@@ -91,10 +90,8 @@ class Loci:
         """
         np.savez(LAMBDAfile, LAMBDA=self.LAMBDA, NU=self.NU)
 
-
-    def plotRiemannMatlab(self,part,eng,n=3,label=['$\nu$','$\lambda']):
-        """
-        Plot Riemman surfaces with matlab [optional]
+    def plotRiemannMatlab(self, part, eng, n=3, label=[r'$\nu$', r'$\lambda']):
+        """ Plot Riemman surfaces with matlab [optional].
 
         Remarks
         -------
@@ -117,63 +114,63 @@ class Loci:
             list of (x,y) axis and z axis latex label
         """
         try:
-            from ME4pyUtils import np2mlarray, mlarray2np
-        except:
-            raise NameError('This optional method requires ME4pyUtils')
+            from ME4pyUtils import np2mlarray
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError('This optional method requires ME4pyUtils.')
 
         # extract the real or imaginary part
-        if part=='Re':
-            LAMBDAc_m = np2mlarray(self.LAMBDA.real[:,:,0:n])
-        elif part =='Im':
-            LAMBDAc_m = np2mlarray(1j*self.LAMBDA.imag[:,:,0:n])
+        if part == 'Re':
+            LAMBDAc_m = np2mlarray(self.LAMBDA.real[:, :, 0:n])
+        elif part == 'Im':
+            LAMBDAc_m = np2mlarray(1j*self.LAMBDA.imag[:, :, 0:n])
         else:
             raise NameError("Wrong argument, part must be 'Re' or 'Im'")
 
-        NU_real=np2mlarray(self.NU.real)
-        NU_imag=np2mlarray(self.NU.imag)
-        out = eng.PlotRiemann(LAMBDAc_m,NU_real,NU_imag,part,n,label)
+        NU_real = np2mlarray(self.NU.real)
+        NU_imag = np2mlarray(self.NU.imag)
+        _ = eng.PlotRiemann(LAMBDAc_m, NU_real, NU_imag, part, n, label)
 
-    def plotRiemann(self, Type='Re', N=2, EP_loc = None, Title='empty',
+    def plotRiemann(self, Type='Re', N=2, EP_loc=None, Title='empty',
                     Couleur='k', variable='\\nu', fig=-2, nooutput=False):
-        """
-        Plot Riemman surfaces of the selected eigenvalues
+        """ Plot Riemman surfaces of the selected eigenvalues.
 
-        The real or imaginary part of the values to be plotted are sorted and the delaunay tessalation
-        are used to draw possibility dicontinuous surfaces
+        The real or imaginary part of the values to be plotted are sorted and
+        the delaunay tessalation are used to draw possibility dicontinuous
+        surfaces.
 
         Parameters
         -----------
-        Type: {'Re','Im'}, default: 'Re'
-            Specify which part of the complex parameter is plotted
-        N: int, default: 2
-            Maximum number of eigenvalues to be plotted
-        EP_loc: (N-1,) array_like
+        Type : {'Re','Im'}, default: 'Re'
+            Specify which part of the complex parameter is plotted.
+        N : int, default: 2
+            Maximum number of eigenvalues to be plotted.
+        EP_loc : (N-1,) array_like
             Values of the N-1 EP between each consecutive eigenvalues
-            When specifyed, the EP position is plotted
-        Title: str, default: 'empty'
-            Figure title
-        Couleur: str, default: 'k'
+            When specifyed, the EP position is plotted.
+        Title : str, default: 'empty'
+            Figure title.
+        Couleur : str, default: 'k'
             Annotation color
-        variable: str, default: '\\nu'
-            Variable name for axis labels
-        fig: int, default: -2
-            Figure numerotation
+        variable : str, default: '\\nu'
+            Variable name for axis labels.
+        fig : int, default: -2
+            Figure numerotation.
         nooutput : bool
-            remove ploting (usefull for tests)
+            Remove ploting (usefull for tests).
 
         Returns
         -------
         fig: fig
-            the pyplot fig
+            The pyplot fig.
         ax: axes
-            the pyplot axes for futher plot
+            The pyplot axes for futher plot.
 
         """
-        #TODO : Add plotting option to plot the intersection of the Riemann surface
-        #with a given plane (for instance with the real plane to illustrate real
-        #eigenvalue loci)
+        # TODO : Add plotting option to plot the intersection of the Riemann surface
+        # with a given plane (for instance with the real plane to illustrate real
+        # eigenvalue loci)
 
-        lda=np.asarray(self.LAMBDA)
+        lda = np.asarray(self.LAMBDA)
         nur = self.NU.real
         nui = self.NU.imag
 
@@ -181,44 +178,47 @@ class Loci:
             print('Warning : lda, nur and nui shapes are not consistent')
             return
 
-        ### Generate ldaplot with reordered data from lda
+        # Generate ldaplot with reordered data from lda
         if Type == 'Re':
-            indx = np.argsort(lda.real,axis=2)
+            indx = np.argsort(lda.real, axis=2)
         elif Type == 'Im':
-            indx = np.argsort(lda.imag,axis=2)
+            indx = np.argsort(lda.imag, axis=2)
         elif Type == 'Im_abs':
             indx = np.argsort(np.abs(lda.imag), axis=2)
         elif Type == 'Re_abs':
             indx = np.argsort(np.abs(lda.real), axis=2)
         ldaplot = np.take_along_axis(lda, indx, axis=2)
 
-        #u, v = np.meshgrid(Pr, nui)
+        # u, v = np.meshgrid(Pr, nui)
         u, v = nur.flatten(), nui.flatten()
-        tri = mtri.Triangulation(u,v) # Triangulate parameter space using Delaunay triangulation
+        # Triangulate parameter space using Delaunay triangulation
+        tri = mtri.Triangulation(u, v)
 
-        ### Plot
-        #Fig = plt.figure(num=fig,figsize=plt.figaspect(.5))
-        #ax = Fig.add_subplot(1, 2, 1, projection='3d')
+        # Plot
         Fig = plt.figure(num=fig)
         ax = Fig.add_subplot(111, projection='3d')
-        for mode in range(min(len(lda),N)):
+        for mode in range(min(len(lda), N)):
             if Type == 'Re':
-                ax.plot_trisurf(u,v, ldaplot[:,:,mode].flatten().real, triangles=tri.triangles, cmap=plt.cm.Spectral)
+                ax.plot_trisurf(u, v, ldaplot[:, :, mode].flatten().real,
+                                triangles=tri.triangles, cmap=plt.cm.Spectral)
             elif Type == 'Im':
-                ax.plot_trisurf(u,v, ldaplot[:,:,mode].flatten().imag, triangles=tri.triangles, cmap=plt.cm.Spectral)
+                ax.plot_trisurf(u, v, ldaplot[:, :, mode].flatten().imag,
+                                triangles=tri.triangles, cmap=plt.cm.Spectral)
 
-        ### Add EP plot
-        if EP_loc != None:
+        # Add EP plot
+        if EP_loc is not None:
             Xlim = ax.get_xlim()
             YLim = ax.get_ylim()
             Zlim = ax.get_zlim()
             for i in range(len(EP_loc)):
-                ax.plot([EP_loc[i].real, EP_loc[i].real],[EP_loc[i].imag, EP_loc[i].imag], Zlim,linestyle='--',color=Couleur, linewidth=0.5)
-                shift = ((Xlim[1]-Xlim[0])/40.);
-                ax.text(EP_loc[i].real + shift, EP_loc[i].imag + shift, Zlim[0] + 2*shift, '$EP_%i$'%i,color=Couleur)
+                ax.plot([EP_loc[i].real, EP_loc[i].real], [EP_loc[i].imag, EP_loc[i].imag],
+                        Zlim, linestyle='--', color=Couleur, linewidth=0.5)
+                shift = ((Xlim[1]-Xlim[0])/40.)
+                ax.text(EP_loc[i].real + shift, EP_loc[i].imag + shift,
+                        Zlim[0] + 2*shift, '$EP_%i$' % i, color=Couleur)
 
-        ### Fancy plot
-        if Title!='empty':
+        # Fancy plot
+        if Title != 'empty':
             Fig.canvas.set_window_title(Title)
         ax.set_xlabel(r'$\mathrm{Re}\,' + variable + r' $')
         ax.set_ylabel(r'$\mathrm{Im}\,' + variable + r' $')
