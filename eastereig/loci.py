@@ -56,7 +56,8 @@ class Loci:
     def __init__(self, LAMBDA=None, NU=None):
         """ Initialisation with numpy nd array.
         """
-        # Todo add check on LAMDA to be consitent with plotting constaint
+        # TODO add check on LAMDA to be consitent with plotting constaint
+        # TODO asarray ?
         self.LAMBDA = LAMBDA
         self.NU = NU
 
@@ -90,6 +91,7 @@ class Loci:
         """
         np.savez(LAMBDAfile, LAMBDA=self.LAMBDA, NU=self.NU)
 
+    # %% Using matplotlib
     def plotRiemannMatlab(self, part, eng, n=3, label=[r'$\nu$', r'$\lambda']):
         """ Plot Riemman surfaces with matlab [optional].
 
@@ -130,6 +132,7 @@ class Loci:
         NU_imag = np2mlarray(self.NU.imag)
         _ = eng.PlotRiemann(LAMBDAc_m, NU_real, NU_imag, part, n, label)
 
+    # %% Using matplotlib
     def plotRiemann(self, Type='Re', N=2, EP_loc=None, Title='empty',
                     Couleur='k', variable='\\nu', fig=-2, nooutput=False):
         """ Plot Riemman surfaces of the selected eigenvalues.
@@ -317,3 +320,184 @@ class Loci:
         im.set_clim(np.quantile(field.ravel(), clip[0]),
                     np.quantile(field.ravel(), clip[1]))
         return Fig, ax, im
+
+
+
+# %% Using pyvista
+    def plotRiemannPyvista(self, Type='Re', N=2, Title='empty',
+                           variable='\\nu', lda_list=None, qt=True):
+        """ Plot Riemman surfaces of the selected eigenvalues using pyvista.
+
+        The real or imaginary part of the values to be plotted are sorted and
+        the delaunay tessalation are used to draw possibility dicontinuous
+        surfaces. The color is given by the other part. eg if `Type='Re'`,
+        the color is given by the imaginary part. It allows to see an EP,
+        since both height and color should be the same.
+
+        Some key can be used to interact with the plot:
+            'p' allows to pick points (may break if zscale is modified)
+            't' allows to toogle to 'points' representation
+            'w' allows to toogle to 'wireframe' representation
+            's' allows to toogle to 'surface' representation
+            'q' to quit.
+
+        Parameters
+        -----------
+        Type : {'Re','Im'}, default: 'Re'
+            Specify which part of the complex parameter is plotted.
+        N : int, default: 2
+            Maximum number of eigenvalues to be plotted.
+        Title : str, default: 'empty'
+            Figure title.
+        variable : str, default: '\\nu'
+            Variable name for axis labels.
+        qt : bool
+            Flag to swtich between `pyvista` and `pyvistaqt`. It allows to plot
+            in background using another thread.
+
+        Returns
+        -------
+        pv: Plotter
+            The pyvista plotter object.
+        picked: list
+            The list of the coordinates of the picked points.
+        """
+        try:           
+            import pyvista as pv
+            # pyvistaqt allows to plot in background
+            if qt:
+                try:
+                    from pyvistaqt import BackgroundPlotter as Plotter
+                except ModuleNotFoundError:
+                    print('The module `pyvistaqt` is not installed. Set `qt=False`.')
+            else:
+                Plotter = pv.Plotter
+        except ModuleNotFoundError:
+            print('The module `pyvista` is not installed.')
+            return
+
+        # Default size of the check box
+        Startpos = 12
+        size = 50
+
+        # Define a Class to hide or add an actor
+        class SetVisibilityCallback:
+            """Helper callback to keep a reference to the actor being modified."""
+            def __init__(self, actor):
+                self.actor = actor
+
+            def __call__(self, state):
+                # self.actor.SetVisibility(state)
+                if state:
+                    p.add_actor(self.actor)
+                else:
+                    p.remove_actor(self.actor)
+                p.update_bounds_axes()
+
+
+        # Recast data for plotting
+        if lda_list is not None:
+            lda = np.asarray(self.LAMBDA[:, :, lda_list])
+            if N> len(lda_list): N=len(lda_list)
+        else:
+            lda = np.asarray(self.LAMBDA)
+        nur = self.NU.real
+        nui = self.NU.imag
+
+        if np.shape(lda)[:2] != np.shape(nur) != np.shape(nui):
+            print('Warning : lda, nur and nui shapes are not consistent')
+            return
+
+        # Generate ldaplot with reordered data from lda
+        if Type == 'Re':
+            indx = np.argsort(lda.real, axis=2)
+        elif Type == 'Im':
+            indx = np.argsort(lda.imag, axis=2)
+        elif Type == 'Im_abs':
+            indx = np.argsort(np.abs(lda.imag), axis=2)
+        elif Type == 'Re_abs':
+            indx = np.argsort(np.abs(lda.real), axis=2)
+        ldaplot = np.take_along_axis(lda, indx, axis=2)
+
+        # u, v = np.meshgrid(Pr, nui)
+        u, v = nur.flatten(), nui.flatten()
+
+        # Create all the surfaces
+        surfs = []
+        col_name = {'Re': 'Im λ', 'Im': 'Re λ'}
+        for mode in range(min(len(lda), N)):
+            if Type == 'Re':
+                points = np.column_stack([u, v,  ldaplot[:, :, mode].ravel().real])
+                col = ldaplot[:, :, mode].ravel().imag
+            elif Type == 'Im':
+                points = np.column_stack([u, v,  ldaplot[:, :, mode].ravel().imag])
+                col = ldaplot[:, :, mode].ravel().real
+            cloud = pv.PolyData(points)
+            cloud[col_name[Type]] = col
+            # Triangulate parameter space using Delaunay triangulation
+            surfs.append(cloud.delaunay_2d())
+
+        # Add them to the plotter object
+        p = Plotter(title='Riemann surface')
+        actors = []
+        for surf in surfs:
+            actors.append(p.add_mesh(surf, show_edges=True, pickable=True,
+                                     render_points_as_spheres=True, point_size=10.0))
+
+        # Add a check box for all actors
+        for actor in actors:
+            callback = SetVisibilityCallback(actor)
+            p.add_checkbox_button_widget(callback, value=True,
+                                         position=(5.0, Startpos), size=size,
+                                         border_size=1,
+                                         color_on='red',
+                                         color_off='grey',
+                                         background_color='grey')
+            Startpos = Startpos + size + (size // 10)
+
+        # Define the scale slider
+        def scale(zscale):
+            p.set_scale(zscale=zscale)
+        # FIXME set scale break the picking https://github.com/pyvista/pyvista/issues/1335
+        slider = p.add_slider_widget(scale, [0.1, 10], value=1, title='z scaling')
+
+        # Define axis layout
+        # FIXME still trouble with tex and utf8 chars...
+        xlabel = u'Re ν'
+        ylabel = 'Im \u03bd'
+        if Type == 'Re':
+            zlabel = 'Re λ'
+        else:
+            zlabel = 'Im λ'
+        # axes_actor.SetXAxisLabelText(xlabel)
+        p.show_grid(xlabel=xlabel, ylabel=ylabel, zlabel=zlabel)
+
+        # Define picker
+        # Add a picker label style
+        dargs = dict(name='labels', font_size=24)
+        picked = []
+        def picker_callback(pid):
+            """Plot the picked node label."""
+            label = str(np.round(pid, decimals=2))
+            print('> picked point at :', pid)
+            p.add_point_labels(pid, [label], **dargs)
+            picked.append(pid)
+
+        p.enable_point_picking(callback=picker_callback, show_message=True,
+                               color='pink', point_size=15,
+                               show_point=True)
+
+        # TODO add a clip-box widget
+        # p.add_mesh_clip_box(surfs[0], color='white')
+
+        # Add a key to switch to 'Points' representation
+        def toogle_to_point():
+            """Toogle all Riemann surface to points reprensentation."""
+            for actor in actors:
+                prop = actor.GetProperty()
+                prop.SetRepresentationToPoints()
+            p.update()
+        p.add_key_event('t', toogle_to_point)
+        p.show()  # auto_close=True,
+
+        return p, picked
