@@ -81,7 +81,7 @@ class CharPol():
                 ValueError('If initialized by a list of array, nu0 is mandatory.')
 
         elif isinstance(dLambda[0], AbstractEig):
-            self.dLambda = [vp.dlda for vp in dLambda]
+            self.dLambda = [np.array(vp.dlda) for vp in dLambda]
             try:
                 # this attribute is created in `getDerivative*` method.
                 # check for it are handle error.
