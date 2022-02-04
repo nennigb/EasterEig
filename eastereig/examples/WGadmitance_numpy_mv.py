@@ -66,6 +66,9 @@ import matplotlib.pyplot as plt
 # eastereig
 import eastereig as ee
 import sympy as sym
+import pypolsys
+import time
+
 
 class Ynumpy(ee.OPmv):
     """Create a subclass of the interface class OP that describe the problem operator."""
@@ -296,8 +299,42 @@ def convert2polsys(p0):
 
     return N, n_coef_per_eq, all_coef, all_deg
 
+def check_EP(lda, nu):
+    """Check if a triple (lda, nu, mu) is a solution at k."""
+    duct = Ynumpy(y=nu, n=N, h=h, rho=rho0, c=c0, k=k0)
+    L = duct.createL(lda)
+    return L.shape[0] - np.linalg.matrix_rank(L)
 
-# def main(N=5):
+def pypolsys_solve(p0, degrees=None):
+    """Solve EP3 with pypolsys."""
+    if degrees:
+        p = drop_higher_degree(p0, degrees)
+    else:
+        p = p0
+    out4polsys = convert2polsys(p)
+    with open('admitance.pkl','wb') as f:
+        pickle.dump(out4polsys, f)
+    
+
+    pypolsys.polsys.init_poly(*out4polsys)
+    pypolsys.polsys.init_partition(*pypolsys.utils.make_h_part(3))        
+    tic = time.time()
+    bplp = pypolsys.polsys.solve(1e-4, 1e-14, 0.0)
+    toc = time.time()
+    t = toc-tic
+    r = pypolsys.polsys.myroots.copy()
+    return bplp, r
+
+def drop_higher_degree(p, degrees):
+    """Remove higher degree (tuple) for the Sympy poly object
+    """
+    p_dict = p.as_dict()
+    for key, val in list(p_dict.items()):
+        if (np.array(key) > np.array(degrees)).any():
+            del p_dict[key]
+    return sym.Poly.from_dict(p_dict, p.gens)
+
+# %% Main
 if __name__ == '__main__':
     import time
     import pickle
@@ -319,7 +356,7 @@ if __name__ == '__main__':
     vp1 : Eig
         The object containing all information on the 1st eigenvalue
     """
-    N = 50
+    N = 200
     pi = np.pi
     # Number of derivative
     Nderiv = (4, 4)
@@ -331,8 +368,10 @@ if __name__ == '__main__':
     # nu0 = [3.0 + 3j, 3.0 + 3.0j]
     # nu0 = [0.0+0.00j, 0.]
     nu0_manu = np.array([3.1781+ 4.6751j, 3.0875 + 3.6234j])
-    # nu0 = 1.5*nu0_manu/1j
-    nu0 = (0j, 0j)
+    nu0 = 1.5*nu0_manu/1j
+    # nu0 = (0j, 0j)
+    # Use to find the distance
+    tol_locate = 0.1
     
     # number of dof
     # N=5 -> move to function
@@ -407,11 +446,39 @@ if __name__ == '__main__':
     # %% play with Groebner
     p0, variables = ee.CharPol.taylor2sympyPol(C.dcoefs, tol=1e-5)
 
-    # Try to solve with polsys
-    out4polsys = convert2polsys(p0)
-    with open('admitance.pkl','wb') as f:
-        pickle.dump(out4polsys, f)
-
+    # %% pypolsys solve
+    is_pypolsys = True
+    if is_pypolsys:
+        bplp, r = pypolsys_solve(p0)
+        r[1, :] += nu0[0]
+        r[2, :] += nu0[1]
+        for n in range(bplp):
+            ldan, nun, mun = r[0:3, n]
+            print(n, ldan, nun, mun)
+        plt.figure('compare')
+        plt.plot(r[1, :].real, r[1,:].imag, 'k.', label='nu0 (pypolsys)')
+        plt.plot(sol[:, 1].real, sol[:, 1].imag, 'bo', label='nu0 (newton)', markerfacecolor='none')
+        plt.plot(nu_s.real, nu_s.imag, 'rs', label='nu0 (ref)', markerfacecolor='none', markersize='10')
+        plt.xlim([0, 5])
+        plt.ylim([0, -5])
+        plt.legend()
+        
+        # truncate
+        bplpt, rt = pypolsys_solve(p0, degrees=(p0.degree(0), p0.degree(1) -1 , p0.degree(2) - 1))
+        rt[1, :] += nu0[0]
+        rt[2, :] += nu0[1]
+        plt.plot(rt[1, :].real, rt[1,:].imag, 'k+', label='nu0 (pypolsys n-1)')
+        
+        # find the closest point in both set
+        from scipy.spatial.distance import cdist
+        D = cdist(r[0:3, :].T, rt[0:3, :].T, lambda u, v: np.abs(u-v).sum())
+        index = np.nonzero(D < tol_locate)
+        for i in range(index[0].size):
+            print(r[0:3, index[0][i]])
+            print(rt[0:3, index[1][i]])
+            print('\n')
+        
+        # truncate and do the same
     # for k,v in p0.as_dict().items():
     #     print(k, v)
 
