@@ -164,7 +164,7 @@ class CharPol():
         M = len(dLambda)
         # Intialize the coef of the polynomial
         dcoef_pol = []
-        dcoef0 = np.zeros_like(dLambda[0], dtype=np.complex)
+        dcoef0 = np.zeros_like(dLambda[0], dtype=complex)
         dcoef0.flat[0] = 1.
         dcoef_pol.append(dcoef0)
 
@@ -172,7 +172,7 @@ class CharPol():
         for order in range(1, M+1):
             lda_id = np.arange(0, M)
             # local coeff for summation
-            dcoef_pol_ = np.zeros_like(dLambda[0], dtype=np.complex)
+            dcoef_pol_ = np.zeros_like(dLambda[0], dtype=complex)
 
             # TODO add test if no product ?
             # get all combinaison of with 1 eigenvalue , 2 etc....
@@ -217,9 +217,9 @@ class CharPol():
         deg = len(self.dcoefs)
         # Extract input value
         lda, *nu = vals
-        nu = np.array(nu, dtype=np.complex) - np.array(self.nu0, dtype=np.complex)
+        nu = np.array(nu, dtype=complex) - np.array(self.nu0, dtype=complex)
         # compute the an coefficients at nu
-        an = np.zeros((len(self.dcoefs),), dtype=np.complex)
+        an = np.zeros((len(self.dcoefs),), dtype=complex)
         # Compute a_n at nu
         for n, a in enumerate(self.dcoefs):
             # an[n] = pu._valnd(polyval, a, *nu)
@@ -229,11 +229,11 @@ class CharPol():
 
         # Create a coefficient matrix to account for lda derivatives
         # [[1, 1, 1, 1], [3, 2, 1, 1], [2, 1, 1, 1]
-        DA = np.ones((N, deg), dtype=np.complex)
+        DA = np.ones((N, deg), dtype=complex)
         for i in range(1, N):
             DA[i, :-i] = np.arange((deg-i), 0, -1)
         # Evaluate each polynom pi
-        v = np.zeros((N,), dtype=np.complex)
+        v = np.zeros((N,), dtype=complex)
         for n in range(0, N):
             # apply derivative with respect to lda
             dan = an[slice(0, deg-n)] * np.prod(DA[0:(n+1), slice(0, deg-n)], 0)
@@ -266,7 +266,7 @@ class CharPol():
         shape = np.array(self.dcoefs[0].shape)
         # Create a coefficient matrix dlda_prod to account for lda derivatives
         # [[1, 1, 1, 1], [3, 2, 1, 1], [2, 1, 1, 1]
-        DA = np.ones((N+1, deg), dtype=np.complex)
+        DA = np.ones((N+1, deg), dtype=complex)
         for i in range(1, N+1):
             DA[i, :-i] = np.arange((deg-i), 0, -1)
         self._dlda_prod = np.cumprod(DA, 0)
@@ -281,7 +281,7 @@ class CharPol():
             for col in range(0, N):
                 # store coef for lda-evaluation
                 # recall that an[0] * lda**n
-                an = np.zeros((len(self.dcoefs),), dtype=np.complex)
+                an = np.zeros((len(self.dcoefs),), dtype=complex)
                 # create the matrix accounting for derivative of coefs
                 der_coef_list = []
                 start = np.zeros_like(shape)
@@ -344,8 +344,8 @@ class CharPol():
         deg = len(self.dcoefs)
         # Extract input value
         lda, *nu = vals
-        nu = np.array(nu, dtype=np.complex) - np.array(self.nu0, dtype=np.complex)
-        J = np.zeros((N, N), dtype=np.complex)
+        nu = np.array(nu, dtype=complex) - np.array(self.nu0, dtype=complex)
+        J = np.zeros((N, N), dtype=complex)
 
         # Alias coefficient matrix dlda_prod to account for lda derivatives
         dlda_prod = self._dlda_prod
@@ -360,13 +360,13 @@ class CharPol():
             for col in range(0, N):
                 # store coef for lda-evaluation
                 # recall that an[0] * lda**n
-                an = np.zeros((len(self.dcoefs),), dtype=np.complex)
+                an = np.zeros((len(self.dcoefs),), dtype=complex)
                 # Loop over the polynomial coefs
                 for n, a in enumerate(self.dcoefs):
                     # Recall that a[0,...,0] * nu0**0 * ... * nu_m**0
                     # Create a zeros matrix
                     # Maintains fortran ordering
-                    da = np.zeros(da_shape[row, col], dtype=np.complex, order='F')
+                    da = np.zeros(da_shape[row, col], dtype=complex, order='F')
                     # and fill it with the shifted the coef matrix
                     da = a[da_slice[row, col]] * der_coef[row, col]
                     # an[n] = pu._valnd(polyval, da, *nu)
@@ -428,8 +428,8 @@ class CharPol():
             an[0] * lda **(n-1) + ... + an[n-1]
         """
         # Extract input value
-        nu = np.array(nu, dtype=np.complex) - np.array(self.nu0, dtype=np.complex)
-        an = np.zeros((len(self.dcoefs),), dtype=np.complex)
+        nu = np.array(nu, dtype=complex) - np.array(self.nu0, dtype=complex)
+        an = np.zeros((len(self.dcoefs),), dtype=complex)
         # Compute a_n at nu
         for n, a in enumerate(self.dcoefs):
             # an[n] = pu._valnd(polyval, a, *nu)
@@ -719,7 +719,7 @@ class CharPol():
             # Convert it into numpy univariate polynomial format
             # use all_coeffs else missing 0 coefs for numpy roots
             if len(last_g.free_symbols) > 0:
-                c = np.array(last_g.all_coeffs(), dtype=np.complex)
+                c = np.array(last_g.all_coeffs(), dtype=complex)
             else:
                 # No solution, return without modification
                 return sol
@@ -760,7 +760,7 @@ class CharPol():
 
     def getdH(self):
         r""" Compute the Taylor series of H function with respect to nu.
-        
+
         H is proportional to the discriminant of the partial characteristic polynomial.
 
         This method provides Taylor series of Discriminant, whereas the `discriminant`
@@ -874,7 +874,7 @@ class CharPol():
         $$
         By solving it, we can find \(\boldsymbol \nu\) leading to higher order EP.
         The number of line is equal to #nu.
-        
+
         Parameters
         ----------
         vals : iterable
@@ -897,7 +897,7 @@ class CharPol():
         an = self._eval_an_at(nu)
         n = an.size - 1
         # Initialize output v
-        v = np.zeros((len(self.dcoefs[0].shape),), dtype=np.complex)
+        v = np.zeros((len(self.dcoefs[0].shape),), dtype=complex)
         for i, vi in enumerate(v):
             if i==0:
                 p = an
@@ -959,7 +959,7 @@ class CharPol():
         n = q.size
         # size of the Symvester matrix
         N = m + n - 2
-        S = np.zeros((N, N), dtype=np.complex)
+        S = np.zeros((N, N), dtype=complex)
         # if q has higher degree, need to swap them
         if n > m:
             p, q = q, p
@@ -1007,7 +1007,7 @@ class Taylor:
         The evaluation of the Taylor series at nu.
         """
         # Extract input value
-        nu = np.array(nu, dtype=np.complex) - np.array(self.nu0, dtype=np.complex)
+        nu = np.array(nu, dtype=complex) - np.array(self.nu0, dtype=complex)
         # Evaluate the polynomial
         return polyvalnd(nu, self.an)
 
@@ -1049,7 +1049,7 @@ class Taylor:
     #     else:
     #         # quelquonque
     #         N = len(coef[0])
-    #         r=np.zeros((n-1, N), dtype=np.complex)
+    #         r=np.zeros((n-1, N), dtype=complex)
 
     #         for i, c in enumerate(zip(*coef)):
     #             print(c)
