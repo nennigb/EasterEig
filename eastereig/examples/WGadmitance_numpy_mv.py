@@ -42,6 +42,8 @@ for the axial wavenumber. The admintance is Y=1/Z.
 
 FIXME : put good value in the example
 
+WArning, mu and nu are multiplied by 1j wrt to Manu and Jane papers.
+
 Examples
 --------
 >>> import numpy as np
@@ -270,7 +272,7 @@ def convert2polsys(p0):
     N = 2
     n_coef_per_eq = np.array([6, 6], dtype=np.integer)
     all_coef = np.array([-9.80e-04, 9.78e+05,  -9.80e+00, -2.35e+02, 8.89e+04, -1.00e+00,
-                         -1.00e-02, -9.84e-01, -2.97e+01,  9.87e-03,-1.24e-01, -2.50e-01], dtype=np.complex)
+                         -1.00e-02, -9.84e-01, -2.97e+01,  9.87e-03,-1.24e-01, -2.50e-01], dtype=complex)
     all_deg = np.zeros((np.sum(n_coef_per_eq), N), dtype=np.integer)
     """
     # number of variables
@@ -283,7 +285,7 @@ def convert2polsys(p0):
     deg_list = []
 
     # Conversion
-    n_coef_per_eq = np.zeros((N,), dtype=np.integer)
+    n_coef_per_eq = np.zeros((N,), dtype=np.int64)
     for n, p in enumerate(P):
         pd = p.as_dict()
         k = 0
@@ -294,8 +296,8 @@ def convert2polsys(p0):
         # store the number of terms for this polynomial
         n_coef_per_eq[n] = k
 
-    all_coef = np.array(coeff_list, dtype=np.complex)
-    all_deg = np.array(deg_list, dtype=np.int)
+    all_coef = np.array(coeff_list, dtype=complex)
+    all_deg = np.array(deg_list, dtype=np.int64)
 
     return N, n_coef_per_eq, all_coef, all_deg
 
@@ -305,23 +307,27 @@ def check_EP(lda, nu):
     L = duct.createL(lda)
     return L.shape[0] - np.linalg.matrix_rank(L)
 
-def pypolsys_solve(p0, degrees=None):
+def pypolsys_solve(p0, degrees=None, dense=True):
     """Solve EP3 with pypolsys."""
     if degrees:
         p = drop_higher_degree(p0, degrees)
     else:
         p = p0
     out4polsys = convert2polsys(p)
-    with open('admitance.pkl','wb') as f:
-        pickle.dump(out4polsys, f)
-    
-
+    if dense:
+        out4polsys = pypolsys.utils.toDense(*out4polsys)
+    # with open('admitance.pkl','wb') as f:
+    #     pickle.dump(out4polsys, f)
     pypolsys.polsys.init_poly(*out4polsys)
     pypolsys.polsys.init_partition(*pypolsys.utils.make_h_part(3))        
     tic = time.time()
-    bplp = pypolsys.polsys.solve(1e-4, 1e-14, 0.0)
+    # The solution may be quite sensitive to the tracktol especially for low order pols
+    # If Nderiv=4 1e-3- 1e-5 works well 
+    # If Nderiv=3 1e-4 only works well
+    #bplp = pypolsys.polsys.solve(1e-4, 1e-10, 1e-14, dense=dense)
+    bplp = pypolsys.polsys.solve(1e-5, 1e-8, 0, dense=dense)
     toc = time.time()
-    t = toc-tic
+    print('pypolsys time :', toc-tic)
     r = pypolsys.polsys.myroots.copy()
     return bplp, r
 
@@ -333,6 +339,18 @@ def drop_higher_degree(p, degrees):
         if (np.array(key) > np.array(degrees)).any():
             del p_dict[key]
     return sym.Poly.from_dict(p_dict, p.gens)
+
+
+def locate_ep3(r, rt):
+    """Locate EP3 as a 'common' solution between to solution set."""
+    from scipy.spatial.distance import cdist
+    D = cdist(r[0:3, :].T, rt[0:3, :].T, lambda u, v: np.abs(u-v).sum())
+    index = np.nonzero(D < tol_locate)
+    for i in range(index[0].size):
+        print(r[0:3, index[0][i]])
+        print(rt[0:3, index[1][i]])
+        print('\n')
+    return index
 
 # %% Main
 if __name__ == '__main__':
@@ -359,7 +377,7 @@ if __name__ == '__main__':
     N = 200
     pi = np.pi
     # Number of derivative
-    Nderiv = (4, 4)
+    Nderiv = (5, 5)
     # wavenumer and air properties
     rho0, c0, k0 = 1., 1., 1.
     # duct height
@@ -448,35 +466,30 @@ if __name__ == '__main__':
 
     # %% pypolsys solve
     is_pypolsys = True
+    dense=False
     if is_pypolsys:
-        bplp, r = pypolsys_solve(p0)
+        bplp, r = pypolsys_solve(p0, dense=dense)
         r[1, :] += nu0[0]
         r[2, :] += nu0[1]
-        for n in range(bplp):
-            ldan, nun, mun = r[0:3, n]
-            print(n, ldan, nun, mun)
+        # for n in range(bplp):
+        #     ldan, nun, mun = r[0:3, n]
+        #     print(n, ldan, nun, mun)
         plt.figure('compare')
         plt.plot(r[1, :].real, r[1,:].imag, 'k.', label='nu0 (pypolsys)')
         plt.plot(sol[:, 1].real, sol[:, 1].imag, 'bo', label='nu0 (newton)', markerfacecolor='none')
         plt.plot(nu_s.real, nu_s.imag, 'rs', label='nu0 (ref)', markerfacecolor='none', markersize='10')
         plt.xlim([0, 5])
         plt.ylim([0, -5])
-        plt.legend()
+        
         
         # truncate
-        bplpt, rt = pypolsys_solve(p0, degrees=(p0.degree(0), p0.degree(1) -1 , p0.degree(2) - 1))
+        bplpt, rt = pypolsys_solve(p0, degrees=(p0.degree(0), p0.degree(1) -1 , p0.degree(2) - 1), dense=dense)
         rt[1, :] += nu0[0]
         rt[2, :] += nu0[1]
         plt.plot(rt[1, :].real, rt[1,:].imag, 'k+', label='nu0 (pypolsys n-1)')
-        
+        plt.legend()
         # find the closest point in both set
-        from scipy.spatial.distance import cdist
-        D = cdist(r[0:3, :].T, rt[0:3, :].T, lambda u, v: np.abs(u-v).sum())
-        index = np.nonzero(D < tol_locate)
-        for i in range(index[0].size):
-            print(r[0:3, index[0][i]])
-            print(rt[0:3, index[1][i]])
-            print('\n')
+        index = locate_ep3(r, rt)
         
         # truncate and do the same
     # for k,v in p0.as_dict().items():
@@ -498,7 +511,7 @@ if __name__ == '__main__':
     #     Rho = []
     #     for phi in Phi:
     #         alp = np.tan(phi)
-    #         cn = np.zeros(a.shape[1], dtype=np.complex) + 1e-15
+    #         cn = np.zeros(a.shape[1], dtype=complex) + 1e-15
     #         for n in range(0, a.shape[1]):
     #             for m in range(0, a.shape[0]):
     #                 cn[n] += a[m, n] * (alp**m)
@@ -512,13 +525,13 @@ if __name__ == '__main__':
         alp1, alp2 = np.meshgrid(np.arange(0, a.shape[0]),
                                  np.arange(0, a.shape[1]))
 
-        alp = alp1 + alp2 +0.001
+        alp = alp1 + alp2 + 0.001
         expo = 1 / (alp)
         expo[0, 0] = 0
         d = np.power(np.abs(a), expo)
         print(1/d)
 
-        V = np.hstack( (-alp1.reshape(-1, 1) / alp.reshape(-1,1), -alp2.reshape(-1, 1)/ alp.reshape(-1,1)))
+        V = np.hstack( (-alp1.reshape(-1, 1) / alp.reshape(-1, 1), -alp2.reshape(-1, 1)/ alp.reshape(-1,1)))
         x, y = np.linalg.pinv(V) @ np.log(d.reshape(-1, 1))
 
         return np.exp(x), np.exp(y)
@@ -526,10 +539,13 @@ if __name__ == '__main__':
 
 
     # r = radii(C.dcoefs[2])
-    for n, a in enumerate(C.dcoefs):
-        if n > 0:
-            x, y =radii_fit(a)
-            print(x,y)
+    # Not yet finished
+    if_radii = False
+    if if_radii:
+        for n, a in enumerate(C.dcoefs):
+            if n > 0:
+                x, y =radii_fit(a)
+                print(x, y)
 
 
     # NewOption = sym.Options(g.gens, {'domain': 'CC'})
