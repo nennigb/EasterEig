@@ -36,7 +36,7 @@ from eastereig.utils import _outer, diffprodTree, div_factorial, diffprodMV
 # TODO is still sympy usefull
 import sympy as sym
 import scipy.linalg as spl
-
+import time
 # // evaluation in newton method
 import concurrent.futures
 from functools import partial
@@ -405,13 +405,13 @@ class CharPol():
         # Extract input value
         lda, *nu = vals
         # Evaluate the polynomial *coefficient* at nu
-        an = self._eval_an_at(nu)
+        an = self.eval_an_at(nu)
         # Evaluate the polynomial
         # np.polyval start by high degree
         # np.polynomial.polynomial.polyval start by low degree!!!
         return polyvalnd(lda, an[::-1])
 
-    def _eval_an_at(self, nu):
+    def eval_an_at(self, nu):
         """ Evaluate the partial caracteristic polynomial coefficient an at nu.
 
         Parameters
@@ -501,6 +501,10 @@ class CharPol():
         else:
             return None
 
+    def newton_fom_sol(self, x):
+        """Run newton fron a single point"""
+        return self._newton(self.EP_system, self.jacobian, x)
+
     def newton(self, bounds, Npts=5, decimals=6, max_workers=4, tol=1e-4, verbose=False):
         """ Mesh parametric space and run newton search on each point in
             parallel.
@@ -513,7 +517,7 @@ class CharPol():
         Npts : int
             The number of point in each direction between the bounds.
         decimals : int
-            The number of decimals keep to filter the solution
+            The number of decimals keep to filter the solution (unique)
         max_workers : int
             The number of worker to explore the parametric space.
         normalized : bool
@@ -527,7 +531,7 @@ class CharPol():
             The N 'unique' solutions for the M unknowns in a NxM array.
         """
         # TODO May limit bounds by convergence radius ?
-
+        tic = time.time()
         # Create a coarse mesh of the parametric space for Newton solving
         grid = []
         for bound in bounds:
@@ -549,7 +553,7 @@ class CharPol():
         sol_ = np.array([s for s in all_sol if s is not None])
         # Use unique to remove duplicated row
         sol = np.unique(sol_.round(decimals=decimals), axis=0)
-
+        print(' > ', time.time() - tic, ' s in Newton solve.')
         return sol
 
     @staticmethod
@@ -842,7 +846,7 @@ class CharPol():
         d : complex
         """
         # polynomial coef
-        an = self._eval_an_at(nu)
+        an = self.eval_an_at(nu)
         n = an.size - 1
         dan = an[:-1] * self._dlda_prod[1, :-1]
         # Sylvester need ascending order
@@ -894,7 +898,7 @@ class CharPol():
         The discriminant allows to eliminate \(\lambda\) (or another variable).
         """
         # Compute the polynomial coef
-        an = self._eval_an_at(nu)
+        an = self.eval_an_at(nu)
         n = an.size - 1
         # Initialize output v
         v = np.zeros((len(self.dcoefs[0].shape),), dtype=complex)
