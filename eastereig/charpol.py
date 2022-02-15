@@ -40,7 +40,7 @@ import time
 # // evaluation in newton method
 import concurrent.futures
 from functools import partial
-
+import pickle
 # multidimentional polyval
 # /!\ numpy.polynomial.polynomial.polyval != np.polyval
 # from numpy.polynomial.polynomial import polyval
@@ -103,13 +103,43 @@ class CharPol():
         self.N = len(self.dcoefs) - 1
 
     def __repr__(self):
-        """ Define the representation of the class
+        """ Define the representation of the class.
         """
-        nd = tuple(np.array(self.dLambda[0].shape) - 1 )
+        nd = tuple(np.array(self.dLambda[0].shape) - 1)
         return "Instance of {}  @nu0={} with #{} derivatives and #{} eigs..".format(self.__class__.__name__,
-                                                                      self.nu0,
-                                                                      nd,
-                                                                      self.N)
+                                                                                    self.nu0,
+                                                                                    nd,
+                                                                                    self.N)
+
+    def export(self, filename):
+        """Export a charpol object using pickle.
+
+        Parameters
+        ----------
+        filename : string
+            The full path to save the data.
+        """
+        with open(filename, 'bw') as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(filename):
+        """Load a charpol object from pickle.
+
+        Parameters
+        ----------
+        filename : string
+            The full path to save the data.
+
+        Returns
+        -------
+        C : CharPol
+            The loaded CharPol object.
+        """
+        with open(filename, 'br') as f:
+            C = pickle.load(f)
+        return C
+
 
     def lda(self):
         """ Return the eigenvalue value used in the CharPol.
@@ -501,14 +531,16 @@ class CharPol():
         else:
             return None
 
-    def newton_fom_sol(self, x):
-        """Run newton fron a single point"""
+    def newton_from_sol(self, x):
+        """Run newton fron a single starting point."""
         return self._newton(self.EP_system, self.jacobian, x)
 
     def newton(self, bounds, Npts=5, decimals=6, max_workers=4, tol=1e-4, verbose=False):
         """ Mesh parametric space and run newton search on each point in
             parallel.
-
+  
+        Parameters
+        ----------
         bounds : iterable
             each item must contains the 2 bounds in the complex plane. For
             instance if bounds = [(-1-1j, 1+1j), (-2-2j, 2+2j)],
@@ -794,7 +826,8 @@ class CharPol():
         -------
         H is equal to the discriminant iff an=1, else need to multiply by an**(2*n -2).
         """
-
+        # TODO could it be adapted for multi parameter ?
+        # it will allow to elimitate on variable and continue to use homotopy
         dLambda = self.dLambda
 
         # assume all dLambda have the same shape
