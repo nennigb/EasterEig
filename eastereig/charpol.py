@@ -46,7 +46,7 @@ import pickle
 # from numpy.polynomial.polynomial import polyval
 # import numpy.polynomial.polyutils as pu
 from eastereig.fpoly.fpoly import polyvalnd
-
+import pypolsys
 
 
 class CharPol():
@@ -101,14 +101,16 @@ class CharPol():
 
         # How many eig in the charpol
         self.N = len(self.dcoefs) - 1
+        
+        # Store degree of Taylor expannsion in all variables
+        self._an_taylor_order = tuple(np.array(self.dLambda[0].shape) - 1)
 
     def __repr__(self):
         """ Define the representation of the class.
         """
-        nd = tuple(np.array(self.dLambda[0].shape) - 1)
         return "Instance of {}  @nu0={} with #{} derivatives and #{} eigs..".format(self.__class__.__name__,
                                                                                     self.nu0,
-                                                                                    nd,
+                                                                                    self._an_taylor_order,
                                                                                     self.N)
 
     def export(self, filename):
@@ -538,7 +540,7 @@ class CharPol():
     def newton(self, bounds, Npts=5, decimals=6, max_workers=4, tol=1e-4, verbose=False):
         """ Mesh parametric space and run newton search on each point in
             parallel.
-  
+
         Parameters
         ----------
         bounds : iterable
@@ -587,6 +589,117 @@ class CharPol():
         sol = np.unique(sol_.round(decimals=decimals), axis=0)
         print(' > ', time.time() - tic, ' s in Newton solve.')
         return sol
+
+    def homotopy_solve(self, degree=None, tracktol=1e-5, finaltol=1e-10, singtol=1e-14,
+                       dense=True, bplp_max=2000, oo_tol=1e-5):
+        """Homototy solve of the EP system.
+
+        This method defines a simplified interface to `pypolsys` homotopy
+        solver. Such solver allow to find *all solutions* of the polynomial
+        systems. An upper bound of the number of solution is given by
+        the Bezout number, equal to the product of the degrees each polynomials.
+        This number may be huge.
+        Here, we use a m-homogeneous variable partition to limit the number of
+        spurious solution 'at infinty' to track. The number of paths is given
+        by `bplp`.
+        This method is interesting because all solution are found, whereas
+        for Newton-Raphson method.
+
+        Parameters
+        ----------
+        tracktol : float
+            is the local error tolerance allowed the path tracker along
+            the path.
+        finaltol : float, optional
+            is the accuracy desired for the final solution.  It is used
+            for both the absolute and relative errors in a mixed error criterion.
+        singtol : float, optional
+            is the singularity test threshold used by SINGSYS_PLP.  If
+            INGTOL <= 0.0 on input, then SINGTOL is reset to a default value.
+        dense : bool, optional
+            If `True`, evaluate the polynomial using multivariate Horner scheme,
+            optimized for dense polynomial. Else, monomial evaluation are used.
+        bplp_max : int, optional
+            Provides an upper bounds to run homotopy solving.
+            If `bplp > bplp_max`, the computation is aborted.
+        oo_tol : float, optional
+            Tolerance to drop out solution at infinity. If `oo_tol=0`, all
+            solution are returned.
+
+        Returns
+        -------
+        bplp : int
+            The number of tracked path.
+        r : np.array
+            The solutions of the system express as absolute value wtr to nu0.
+            `r` is `None` if the computation has been aborted. If `oo_tol>0`,
+            the number of rows may be less than `bplp`.
+        """
+        # Convert to sympy
+        p0, variables = self.taylor2sympyPol(self.dcoefs)
+        _lda, *_ = variables
+        deg = self._an_taylor_order
+
+        # Build the system
+        polys = []
+        _lda = p0.gens[0]
+        n_var = len(p0.gens)
+        # Truncate the serie if needed
+        if degree is not None:
+            p0 = self._drop_higher_degree(p0, degree)
+        polys.append(p0)
+        for i in range(1, len(variables)):
+            polys.append(polys[i-1].diff(_lda))
+
+        # pypolsys solve
+        t0 = time.time()
+        sparse_pol = pypolsys.utils.fromSympy(polys)
+        pol = pypolsys.utils.toDense(*sparse_pol)
+        part = pypolsys.utils.make_mh_part(n_var, [[i] for i in range(1, n_var+1)])
+        pypolsys.polsys.init_poly(*pol)
+        pypolsys.polsys.init_partition(*part)
+
+        # Check if there is too much solution
+        bplp = pypolsys.polsys.bezout(singtol)
+        print(' > Bezout number :', bplp)
+        if bplp > bplp_max:
+            return bplp, None
+        else:
+            bplp = pypolsys.polsys.solve(tracktol, finaltol, singtol)
+            r = pypolsys.polsys.myroots.copy()
+            # Express the solution absolutly wrt nu0
+            for i, nu in enumerate(self.nu0):
+                r[i+1, :] += nu
+            # keep only finite solution, filter point at oo
+            finite_sol = np.nonzero(np.abs(r[-1, :]) > oo_tol)
+            print(' > ', time.time() - t0, 's in homotopy solve. Found', bplp, 'solutions.')
+            return bplp, r[:-1, finite_sol[0]].T
+
+    @staticmethod
+    def _drop_higher_degree(p, degrees):
+        """Remove higher degrees for the `sympy` Poly object.
+
+        This method is useful when the polynomial stands for a Taylor series from
+        which you want drop higher order terms.
+
+        Parameters
+        ----------
+        p : Sympy Poly
+            The polynom to truncate.
+        degrees : iterable
+            The maximum degree to keep for each variable.
+
+        Returns
+        -------
+        Sympy Poly
+            The truncated polynomial.
+        """
+        p_dict = p.as_dict()
+        degrees = np.asarray(degrees)
+        for key, val in list(p_dict.items()):
+            if (np.array(key) > degrees).any():
+                del p_dict[key]
+        return sym.Poly.from_dict(p_dict, p.gens)
 
     @staticmethod
     def taylor2sympyPol(coef_list, tol=1e-12):
