@@ -4,7 +4,7 @@ EasterEig
 
 
 
-Consider a parametric eigenvalue problem depending on a parameter \(\nu\). This arises for instance in
+Consider a parametric eigenvalue problem depending on a parameter $$\nu$$. This arises for instance in
 
   - waveguides, where the _wavenumber_ (eigenvalue) depends on the frequency (parameter)
   - waveguides with absorbing materials on the wall, where _modal attenuation_ (eigenvalue imaginary part) depends on the liner properties like impedance, density (parameter)
@@ -47,8 +47,9 @@ Basic workflow and class hierarchy
 
   1. **OP class**, defines operators of your problem
   2. **Eig class**, handles eigenvalues, their derivatives and reconstruction
-  3. **EP class**, combines Eig object to locate EP and compute Puiseux series
-  4. **Loci class**, stores numerical value of eigenvalues loci and allows easy Riemann surface plotting
+  3. **CharPol class**, combines several eigenvalues and their derivatives to reconstruction a part of the characteristic polynomial
+  4. **EP class**, combines Eig object to locate EP and compute Puiseux series
+  5. **Loci class**, stores numerical value of eigenvalues loci and allows easy Riemann surface plotting
 
 Dependencies
 -------------
@@ -56,18 +57,17 @@ Dependencies
 `eastereig` is based on numpy (full) and scipy (sparse) for most internal computation and can handle _large_ parallel sparse matrices thanks to **optional** import of [petsc4py](https://petsc4py.readthedocs.io/en/stable/install.html) (and mumps), 
 [slepc4py](https://slepc4py.readthedocs.io/en/stable/install.html) and
 and [mpi4py](https://mpi4py.readthedocs.io/en/stable/install.html). As non-hermitian problems involve complex-valued eigenvalues, computations are realized with complex arithmetic and the **complex petsc version** is expected.
-Tested for python >= 3.5
+[sympy](https://docs.sympy.org) is used for formal manipulation of multivariate polynomials.
+Riemann surface can also be plotted using the `Loci` class either with `matplotlib` or with [`pyvista`](https://github.com/pyvista/pyvista) and and `pyvistaqt` (optional).
 
 > **Remarks :**
 > To run an example with petsc (parallel), you need to run python with `mpirun` (or `mpiexec`). For instance, to run a program with 2 proc
 > `mpirun -n 2 python myprog.py`
 
-Riemann surface can also be plotted using the `Loci` class either with `matplotlib` or with [`pyvista`](https://github.com/pyvista/pyvista) (optional).
-
 Install 
 --------
 
-You'll need : 
+Before installing `eastereig`, you'll need: 
 * python (tested for v >= 3.5);
 * python packages: numpy, setuptools, wheel
 * pip (optional).
@@ -85,28 +85,27 @@ export EASTEREIG_USE_FPOLY=True
 Consider using `pip` over custom script (rationale [here](https://pip.pypa.io/en/stable/reference/pip_install/)). 
 
 You can install `eastereig` either from pypi (main releases only):
-```
+```console
 pip install eastereig [--user]
 ``` 
 or from github:
-```
+```console
 pip install path/to/EeasterEig-version.tar.gz [--user]
 ```
 or in _editable_ mode if you want to modify the sources
-```
+```console
 pip install -e path/to/EeasterEig
 ```
-> The version of the required libraries specified in `install_requires` field from `setup.py` are given to ensure the backward compatibility up to python 3.5. A more recent version of these libraries can be safely used for recent python version. 
 
 ### Using python setuptools
 Go to root folder.
 and run:
-```
+```console
 python setup.py install [--user]
 ```
 
-To get the lastest updates (dev relases), run: 
-```
+To get the lastest updates (dev releases), run: 
+```console
 python setup.py develop [--user]
 ```
 
@@ -115,7 +114,7 @@ Running tests
 Tests are handled with doctest. 
 
 To execute the full test suite, run :
-```
+```console
 python -m eastereig
 ```
 
@@ -124,15 +123,15 @@ Documentation
 
 ## Generate documentation 
 Run: 
-```
-pdoc3 --html --force --config latex_math=True  eastereig
+```console
+pdoc3 --html --force --config latex_math=True  eastereig [--skip-errors]
 ```
 N.B: The doctring are compatible with several Auto-generate API documentation, like pdoc.
 This notably allows to see latex includes.
 
 ## Generate class diagram
 Run: 
-```
+```console
 pyreverse -s0 eastereig -m yes -f ALL
 dot -Tsvg classes.dot -o classes.svg
 ```
@@ -140,7 +139,7 @@ N.B: Class diagram generation is done using `pyreverse` (installed with pylint a
 
 ## Generate documentation and class diagram
 Both aspects are included in the `makedoc.py' script. So, just run :
-```
+```console
 python ./makedoc.py
 ```
 
@@ -155,25 +154,25 @@ Several working examples are available in `./examples/` folder
 To get started, the first step is to define your problem. Basically it means to link the discrete operators (matrices) and their derivatives to the `eastereig` OP class.
 The problem has to be recast in the following form:
 
-\( \left[ \underbrace{1}_{f_0(\lambda)=1} \mathbf{K}_0(\nu) + \underbrace{\lambda(\nu)}_{f_1(\lambda)=\lambda} \mathbf{K}_1(\nu) + \underbrace{\lambda(\nu)^2}_{f_2(\lambda)} \mathbf{K}_2(\nu) \right] \mathbf{x} =  \mathbf{0} \).
+$$ \left[ \underbrace{1}_{f_0(\lambda)=1} \mathbf{K}_0(\nu) + \underbrace{\lambda(\nu)}_{f_1(\lambda)=\lambda} \mathbf{K}_1(\nu) + \underbrace{\lambda(\nu)^2}_{f_2(\lambda)} \mathbf{K}_2(\nu) \right] \mathbf{x} =  \mathbf{0} $$.
 
 Matrices are then stacked in the variable `K`
 ```python
 K = [K0, K1, K2].
 ```
-**The functions** that return the derivatives with respect to \(\nu\) of each matrices have to be put in `dK`. The prototype of this function is fixed (the parameter n corresponds to the derivative order) to ensure automatic computation of the operator derivatives.
+**The functions** that return the derivatives with respect to $$\nu$$ of each matrices have to be put in `dK`. The prototype of this function is fixed (the parameter n corresponds to the derivative order) to ensure automatic computation of the operator derivatives.
 ```python
 dK = [dK0, dK1, dK2].
 ```
-Finally, **the functions** that returns derivatives with respect to \( \lambda\) are stored in 'flda'
+Finally, **the functions** that returns derivatives with respect to $$\lambda$$ are stored in 'flda'
 ```python
 flda = [None, ee.lda_func.Lda, ee.lda_func.Lda2].
 ```
-Basic linear and quadratic dependency are defined in the module `lda_func`. Others dependencies can be easily implemented; provided that the appropriate eigenvalue solver is also implemented). The `None` keyword is used when there is no dependency to the eigenvalue, e. g. \(\mathbf{K}_0\).
+Basic linear and quadratic dependency are defined in the module `lda_func`. Others dependencies can be easily implemented; provided that the appropriate eigenvalue solver is also implemented). The `None` keyword is used when there is no dependency to the eigenvalue, e. g. $$\mathbf{K}_0$$.
 
 This formulation is used to automatically compute (i) the successive derivatives of the operator and (ii) the RHS associated to the bordered matrix.
 
-These variables are defined by creating **a subclass** that inherits from the eastereig **OP class**. For example, considering a generalized eigenvalue problem \( \left[\mathbf{K}_0(\nu) + \lambda \mathbf{K}_1(\nu) \right] \mathbf{x} =  \mathbf{0} \) :
+These variables are defined by creating **a subclass** that inherits from the eastereig **OP class**. For example, considering a generalized eigenvalue problem $$\left[\mathbf{K}_0(\nu) + \lambda \mathbf{K}_1(\nu) \right] \mathbf{x} =  \mathbf{0} $$:
 
 ```python
 import eastereig as ee
@@ -185,41 +184,41 @@ class MyOP(ee.OP):
         """Initialize the problem."""
         # Initialize OP interface
         self.setnu0(z)
-
+        
         # Mandatory -----------------------------------------------------------
-        self._lib = 'scipysp'  # 'numpy' or 'petsc'
+        self._lib='scipysp' # 'numpy' or 'petsc'
         # Create the operator matrices
         self.K = self.CreateMyMatrix()
         # Define the list of function to compute the derivatives of each operator matrix (assume 2 here)
-        self.dK = [self.dmat0, self.dmat1]
+        self.dK = [self.dmat0, self.dmat1]        
         # Define the list of functions to set the eigenvalue dependency of each operator matrix
-        self.flda = [None, ee.lda_func.Lda]
+        self.flda = [None, ee.lda_func.Lda] 
         # ---------------------------------------------------------------------
 
-    def CreateMyMatrices(self, ...):
+    def CreateMyMatrices(self,...):
         """Create my matrices and return a list."""
-        ...
-        return list_of_Ki
-
-    def dmat0(self, n):
+ 		...
+    	return list_of_Ki
+    
+    def dmat0(self,n):
         """Return the matrix derivative with respect to nu.
 
-        N.B. : The prototype of this function is fixed, the n parameter
-        stands for the derivative order. If the derivative is null,
-        the function returns the value 0.
-        """
-        ...
-        return dM0
-
-    def dmat1(self, n):
+		N.B. : The prototype of this function is fixed, the n parameter
+		stands for the derivative order. If the derivative is null,
+		the function returns the value 0.
+		"""
+		...
+		return dM0
+    
+    def dmat1(self,n):
         """Return the matrix derivative with respect to nu.
 
-        N.B. : The prototype of this function is fixed, the n parameter
-        stands for the derivative order. If the derivative is null,
-        the function returns the value 0.
-        """
-        ...
-        return dM1
+		N.B. : The prototype of this function is fixed, the n parameter
+		stands for the derivative order. If the derivative is null,
+		the function returns the value 0.
+		"""
+		...
+		return dM1
 ```
 
 How to contribute ?
