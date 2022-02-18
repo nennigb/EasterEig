@@ -25,7 +25,7 @@ from scipy.special import factorial, binom
 import itertools as it
 from collections import deque, namedtuple
 from functools import reduce
-
+ 
 
 def multinomial_index_coefficients(m, n):
     r"""Return a tuple containing pairs ``((k1,k2,..,km) , C_kn)``
@@ -430,11 +430,16 @@ def div_factorial(dH):
 
 
 def _outer(*vs):
-    """ Compute the outer product of sequence of vectors.
+    """Compute the outer product of sequence of vectors.
 
     https://stackoverflow.com/questions/17138393/numpy-outer-product-of-n-vectors
+    
+    Parameters
+    ----------
+    vs : tuple of iterable
+        Each element is an array that will contribute to the outer product.
     """
-    return np.multiply.reduce(np.ix_(*vs))
+    return reduce(np.multiply.outer, vs)
 
 
 def pade(an, m, n=None):
