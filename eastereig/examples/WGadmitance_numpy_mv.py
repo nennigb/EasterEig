@@ -64,6 +64,9 @@ import sys
 import numpy as np
 import scipy as sp
 from scipy.special import factorial
+from scipy.spatial import KDTree
+from scipy.spatial.distance import cdist
+from scipy.optimize import linear_sum_assignment
 import matplotlib.pyplot as plt
 # eastereig
 import eastereig as ee
@@ -71,7 +74,11 @@ import sympy as sym
 import pypolsys
 import time
 
-
+import matplotlib
+matplotlib.rc('text', usetex=True)
+# matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+matplotlib.rc('text.latex', preamble=r'\usepackage{amsmath}')
+matplotlib.rcParams.update({'font.size': 12})
 class Ynumpy(ee.OPmv):
     """Create a subclass of the interface class OP that describe the problem operator."""
     def __init__(self, y, n, h, rho, c, k):
@@ -352,6 +359,91 @@ def locate_ep3(r, rt):
         print('\n')
     return index
 
+def direct_solve_MV(nu):
+    """Direct solve with FEM model, the lda are sorted by magnitude."""
+    # Create discrete operator of the pb
+    imp = Ynumpy(y=nu, n=N, h=h, rho=rho0, c=c0, k=k0)
+    # Initialize eigenvalue solver for *generalized eigenvalue problem*
+    imp.createSolver(pb_type='gen')
+    # run the eigenvalue computation
+    Lambda = imp.solver.solve(nev=Nmodes, target=0+0j, skipsym=False)
+    return Lambda
+
+def distance_lda(lda, n_closest=3):
+    """Compute the max distance to the n_closest neighbor."""
+    x, y = lda.real, lda.imag
+    points = np.column_stack([x, y])
+    tree = KDTree(points)
+    d_points = np.zeros((points.shape[0],))
+    for n, point in enumerate(points):
+        dd, ii = tree.query(point, k=n_closest)
+        print(n, dd, ii)
+        d_points[n] = dd.max()
+    return d_points
+
+def compute_approx_error(C, shift_modulus):
+    """Compute the eigenvalue from the CharPol using a complex shift.
+
+    Compute the error using several shift value
+    TODO need to developp for the paper!
+    """
+    Nlda = len(C.dLambda)
+    nu0 = C.nu0
+    shift = np.exp(1j*0.3) * shift_modulus
+    nu_shift = np.array(nu0) + shift
+    # Prediction using CharPol
+    an = C.eval_an_at(nu_shift)
+    lda_C = np.roots(an)
+    # Direct Computation
+    lda_bf = direct_solve_MV(nu_shift)
+    # Prediction using just a single eig approx
+    lda_T = np.zeros((Nlda,), dtype=complex)
+    for n, dLambda in enumerate(C.dLambda):
+        Tlda = ee.charpol.Taylor(dLambda, C.nu0)
+        lda_T[n] = Tlda.eval_at(nu_shift)
+    # Error estimator : pick the Nlda // 2 minimal distances
+    D_C = cdist(lda_bf[:Nlda, np.newaxis], lda_C[:, np.newaxis],
+                lambda u, v: np.abs(u-v))
+    row_ind, col_ind = linear_sum_assignment(D_C)
+    err_C = np.sort(D_C[row_ind, col_ind])[-1]
+
+    D_T = cdist(lda_bf[:Nlda, np.newaxis], lda_T[:, np.newaxis],
+                lambda u, v: np.abs(u-v))
+    row_ind, col_ind = linear_sum_assignment(D_T)
+    err_T = np.sort(D_T[row_ind, col_ind])[-1]
+    return err_C, err_T
+
+
+def compute_error_wtr_number_of_modes(extracted, step=2, rhov=np.linspace(0, 10, 20)):
+    """Run systematic distance check for all solution candidates in `sol`.
+    """
+    Nmax = len(extracted)
+    Nv = np.arange(2, Nmax, step)
+    ERR_C = np.zeros((rhov.size, Nv.size))
+    ERR_T = np.zeros((rhov.size, Nv.size))
+    for n, N in enumerate(Nv):
+        CN = ee.CharPol(extracted[0:N])
+        for i, rho in enumerate(rhov):
+            err_C, err_T = compute_approx_error(CN, rho)
+            ERR_C[i, n] = err_C
+            ERR_T[i, n] = err_T
+            
+    # plot the Error
+    plt.figure('Error')
+    for n, N in enumerate(Nv):
+        plt.plot(rhov, np.log10(ERR_C[:, n]), linestyle='-', marker='.', label='N='+str(Nv[n]))
+    plt.legend()
+    plt.xlabel(r'$|\delta|$')
+    plt.ylabel(r'$\log_{10} E$')
+    
+    # plt.figure('Error T')
+    # for n, N in enumerate(Nv):
+    #     plt.plot(rhov, np.log10(ERR_T[:, n]), linestyle='-', marker='.', label='N='+str(Nv[n]))
+    # plt.legend()
+    # plt.xlabel(r'$|\delta|$')
+    # plt.ylabel(r'$\log_{10} E$')
+    return ERR_C
+
 # %% Main
 if __name__ == '__main__':
     import time
@@ -377,7 +469,7 @@ if __name__ == '__main__':
     N = 200
     pi = np.pi
     # Number of derivative
-    Nderiv = (5, 5)
+    Nderiv = (6, 6)
     # wavenumer and air properties
     rho0, c0, k0 = 1., 1., 1.
     # duct height
@@ -386,7 +478,8 @@ if __name__ == '__main__':
     # nu0 = [3.0 + 3j, 3.0 + 3.0j]
     # nu0 = [0.0+0.00j, 0.]
     nu0_manu = np.array([3.1781+ 4.6751j, 3.0875 + 3.6234j])
-    nu0 = 1.5*nu0_manu/1j
+    nu0 = np.array([1.5, 0.8])*nu0_manu/1j
+    # nu0 = [1 -1.j,  0 -3.j]
     # nu0 = (0j, 0j)
     # Use to find the distance
     tol_locate = 0.1
@@ -395,7 +488,7 @@ if __name__ == '__main__':
     # N=5 -> move to function
     
     # number of mode to compute
-    Nmodes = 6
+    Nmodes = 13
 
     # Create discrete operator of the pb
     imp = Ynumpy(y=nu0, n=N, h=h, rho=rho0, c=c0, k=k0)
@@ -424,6 +517,7 @@ if __name__ == '__main__':
     alpha_s = 4.1969 - 2.6086j
     lda_s = k0**2 - alpha_s**2
     nu_s = np.array((3.1781+ 4.6751j, 3.0875 + 3.6234j))/ 1j
+    nu_s2 = np.array((3.1781+ 4.6751j, 3.0875 + 3.6234j, 3.6598 + 7.9684j, 3.6015+6.9459j, 3.9800+11.189j, 3.9371 +10.176j, 1.0119+4.6029j, 1.0041+7.7896j))/ 1j
     
     val_s = np.array((lda_s, *nu_s))
     C.eval_at(val_s)
@@ -463,31 +557,52 @@ if __name__ == '__main__':
     
     # %% play with Groebner
     p0, variables = ee.CharPol.taylor2sympyPol(C.dcoefs, tol=1e-5)
-
+    
+    # %% Compute error
+    ERR_C = compute_error_wtr_number_of_modes(extracted, rhov=np.linspace(0, 10, 20))
+    
     # %% pypolsys solve
-    is_pypolsys = True
+    is_pypolsys = False
     dense=False
     if is_pypolsys:
         bplp, r = pypolsys_solve(p0, dense=dense)
         r[1, :] += nu0[0]
         r[2, :] += nu0[1]
-        # for n in range(bplp):
-        #     ldan, nun, mun = r[0:3, n]
-        #     print(n, ldan, nun, mun)
-        plt.figure('compare')
-        plt.plot(r[1, :].real, r[1,:].imag, 'k.', label='nu0 (pypolsys)')
-        plt.plot(sol[:, 1].real, sol[:, 1].imag, 'bo', label='nu0 (newton)', markerfacecolor='none')
-        plt.plot(nu_s.real, nu_s.imag, 'rs', label='nu0 (ref)', markerfacecolor='none', markersize='10')
-        plt.xlim([0, 5])
-        plt.ylim([0, -5])
-        
-        
         # truncate
         bplpt, rt = pypolsys_solve(p0, degrees=(p0.degree(0), p0.degree(1) -1 , p0.degree(2) - 1), dense=dense)
         rt[1, :] += nu0[0]
         rt[2, :] += nu0[1]
-        plt.plot(rt[1, :].real, rt[1,:].imag, 'k+', label='nu0 (pypolsys n-1)')
+        # for n in range(bplp):
+        #     ldan, nun, mun = r[0:3, n]
+        #     print(n, ldan, nun, mun)
+        plt.figure('compare')
+        plt.plot(r[1, :].real, r[1,:].imag, 'bo', markerfacecolor='none', label='Homotopy '+ str((p0.degree(1), p0.degree(2))))
+        # Newton may miss the important values. eg nu0= array([7.013-4.767j, 2.899-2.47j ]), Nderiv=7
+        # plt.plot(sol[:, 1].real, sol[:, 1].imag, 'bo', label='nu0 (newton)', markerfacecolor='none')
+        plt.plot(rt[1, :].real, rt[1,:].imag, 'k+', label='Homotopy '+ str((p0.degree(1) -1 , p0.degree(2) - 1)))
+        plt.plot(nu_s.real, nu_s.imag, 'rs', label='ref.', markerfacecolor='none', markersize='10')
+        plt.xlim([0, 12])
+        plt.ylim([0, -5])
         plt.legend()
+        plt.xlabel(r'Re $\nu$')
+        plt.ylabel(r'Im $\nu$')
+        
+        # %% Figuer for CFA
+        plt.figure('compare Manu notation')
+        # invert divistion by 1j
+        plt.plot(-r[1, :].imag, r[1,:].real, 'ko', markerfacecolor='none', label='Homotopy '+ str((p0.degree(1), p0.degree(2))))
+        # Newton may miss the important values. eg nu0= array([7.013-4.767j, 2.899-2.47j ]), Nderiv=7
+        # plt.plot(sol[:, 1].real, sol[:, 1].imag, 'bo', label='nu0 (newton)', markerfacecolor='none')
+        plt.plot(-rt[1, :].imag, rt[1,:].real, 'k+', label='Homotopy '+ str((p0.degree(1) -1 , p0.degree(2) - 1)))
+        plt.plot(-nu_s2.imag, nu_s2.real, 'rs', label='ref.', markerfacecolor='none', markersize='10')
+        plt.plot(-np.array(nu0).imag, np.array(nu0).real, 'b*', label=r'$\boldsymbol{\nu}_0$', markerfacecolor='none', markersize='6')
+        plt.xlim([0, 5])
+        plt.ylim([0, 12])
+        plt.legend()
+        plt.xlabel(r'Re $\nu$')
+        plt.ylabel(r'Im $\nu$')
+        
+        
         # find the closest point in both set
         index = locate_ep3(r, rt)
         
@@ -527,27 +642,28 @@ if __name__ == '__main__':
 
         alp = alp1 + alp2 + 0.001
         expo = 1 / (alp)
+        # log c^0 = 0 * log c
         expo[0, 0] = 0
-        d = np.power(np.abs(a), expo)
-        print(1/d)
+        # d = np.power(np.abs(a), expo)
+        # print(1/d)
 
         V = np.hstack( (-alp1.reshape(-1, 1) / alp.reshape(-1, 1), -alp2.reshape(-1, 1)/ alp.reshape(-1,1)))
-        x, y = np.linalg.pinv(V) @ np.log(d.reshape(-1, 1))
-
+        # x, y = np.linalg.pinv(V) @ np.log(d.reshape(-1, 1))
+        x, y = np.linalg.pinv(V) @ (expo.reshape(-1, 1) * np.log(np.abs(a).reshape(-1, 1)))
         return np.exp(x), np.exp(y)
 
 
 
     # r = radii(C.dcoefs[2])
     # Not yet finished
-    if_radii = False
+    if_radii = True
     if if_radii:
         for n, a in enumerate(C.dcoefs):
             if n > 0:
                 x, y =radii_fit(a)
                 print(x, y)
 
-
+   
     # NewOption = sym.Options(g.gens, {'domain': 'CC'})
     # # sol = _solve_reduced_system2(F, F[0].gens)
     # sol_sympy = solve_generic(g, NewOption)
