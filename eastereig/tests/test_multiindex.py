@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
 
-""" Test with sympy the computation of ultinomial_multiindex_coefficients.
+""" Test with sympy the computation of multinomial_multiindex_coefficients.
 """
 
 import unittest
@@ -29,7 +29,7 @@ except ImportError:
 
 
 class Test_multinomial_multiindex_coefficients(unittest.TestCase):
-    """ Define calculated question parser test cases for unittest.
+    """ Define multinomial multiindex coefficients test cases.
     """
     @classmethod
     def setUpClass(cls):
