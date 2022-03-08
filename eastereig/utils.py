@@ -25,7 +25,66 @@ from scipy.special import factorial, binom
 import itertools as it
 from collections import deque, namedtuple
 from functools import reduce
- 
+
+
+def two_composition(order, max_order):
+    r"""Yields all the 2-compostion of `order` with list of two integers.
+
+    Whereas for _partition_, the order matter. This combinatoric generator
+    could be used to get all terms of a given order in the multiplcation of
+    two polynomials.
+
+    See https://gist.github.com/jasonmc/989158/682cfe1c25d39d5526acaeacc1426d287ef4f5de
+    or https://tel.archives-ouvertes.fr/tel-00668134/document for generalization
+    to k-composition of `order`.
+
+    Parameters
+    ----------
+    order : int
+        The targeted sum.
+    max_order : iterable
+        The max. value for the two items of the list.
+
+    Yields
+    ------
+    tuple
+        The composition members.
+
+    Examples
+    --------
+    All possible arrangements to get 4 with two integers smaller than 4 and 3.
+    >>> for c in two_composition(4, (4, 3)):
+    ...     print(c, sum(c))
+    (4, 0) 4
+    (3, 1) 4
+    (2, 2) 4
+    (1, 3) 4
+
+    Check that all members are there. The compositions of `s` into exactly `n`
+    parts is given by the binomial coefficient \( {s+n-1 \choose s} \)
+    see https://en.wikipedia.org/wiki/Composition_(combinatorics)
+    >>> comp = list(two_composition(3, (3, 3)))
+    >>> len(comp) == binom(3+2-1, 3)
+    True
+    """
+    # Check if it is possible
+    if order > sum(max_order):
+        raise ValueError('Impossible to reach `order` from this `max_order`.')
+
+    # Define the start state
+    if order > max_order[0]:
+        start = (max_order[0], order - max_order[0])
+    else:
+        start = (order, 0)
+
+    # Define the stop criterion
+    delta = order - max_order[1]
+    stop = -1 if delta <= 0 else (delta-1)
+    # Iteration loop
+    for i in range(start[0], stop, -1):
+        j = order-i
+        yield (i, j)
+
 
 def multinomial_index_coefficients(m, n):
     r"""Return a tuple containing pairs ``((k1,k2,..,km) , C_kn)``
