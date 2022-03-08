@@ -31,9 +31,7 @@ import numpy as np
 from numpy.linalg import norm
 import itertools as it
 from eastereig.eig import AbstractEig
-from eastereig.utils import _outer, diffprodTree, div_factorial, diffprodMV
-# from eastereig import EP
-# TODO is still sympy usefull
+from eastereig.utils import _outer, diffprodTree, div_factorial, diffprodMV, two_composition
 import sympy as sym
 import scipy.linalg as spl
 import time
@@ -68,9 +66,19 @@ class CharPol():
 
     """
 
-    def __init__(self, dLambda, nu0=None):
-        """ Initialize the object with a list of derivatives of the eigenvalue or
+    def __init__(self, dLambda, nu0=None, vieta=True):
+        """Initialize the object with a list of derivatives of the eigenvalue or
             a list of Eig objects.
+
+        Parameters
+        ----------
+        dLambda : list
+           List of the derivatives of the eigenvalues used to build this object
+        nu0 : iterable
+            the value where the derivatives are computed
+        vieta : bool, optional, default True
+            Compute or not the CharPol coefficients using Vieta formula.
+            Setting `vieta = False` can be useful for alternative constructors.
         """
 
         if isinstance(dLambda[0], np.ndarray):
@@ -92,22 +100,53 @@ class CharPol():
             TypeError('Unsupported type for dLambda elements.')
 
         # Compute the polynomial coef
-        self.dcoefs = self.vieta(self.dLambda)
-        for i, c in enumerate(self.dcoefs):
-            self.dcoefs[i] = np.asfortranarray(div_factorial(c))
+        if vieta:
+            self.dcoefs = self.vieta(self.dLambda)
+            for i, c in enumerate(self.dcoefs):
+                self.dcoefs[i] = np.asfortranarray(div_factorial(c))
 
+            # Finalize the instanciation
+            self._finalize_init()
+
+    def _finalize_init(self):
+        """Finalize CharPol initialization."""
         # Compute usefull coefficients for jacobian evaluation
         self._jacobian_utils()
 
         # How many eig in the charpol
         self.N = len(self.dcoefs) - 1
-        
+
         # Store degree of Taylor expannsion in all variables
         self._an_taylor_order = tuple(np.array(self.dLambda[0].shape) - 1)
 
-    def __repr__(self):
-        """ Define the representation of the class.
+    @classmethod
+    def _from_dcoefs(cls, dcoefs, dLambda, nu0):
+        """Define factory method to create CharPol from its polynomial coefficients.
+
+        Parameters
+        ----------
+        dcoefs : list
+            List of the derivatives of each coef of the polynom. It is assumed that
+            a_N=1. The coefficaients are sorted in decending order such,
+            1 lda**N + ... + a_0 lda**0
+        dLambda : list
+            List of the derivatives of the eigenvalues used to build this
+            object.
+        nu0 : iterable
+            The value where the derivatives are computed.
+
+        Returns
+        -------
+        C : CharPol
+            An new CharPol instance.
         """
+        C = cls(dLambda, nu0, vieta=False)
+        C.dcoefs = dcoefs
+        C._finalize_init()
+        return C
+
+    def __repr__(self):
+        """Define the representation of the class."""
         return "Instance of {}  @nu0={} with #{} derivatives and #{} eigs..".format(self.__class__.__name__,
                                                                                     self.nu0,
                                                                                     self._an_taylor_order,
@@ -216,6 +255,84 @@ class CharPol():
 
         # Return the successive derivative of the polynomial coef, no factorial !!
         return dcoef_pol
+
+    def multiply(self, C):
+        """Multiply this polynomial by another Charpol Object.
+
+        The two CharPol object must be computed at the same `nu0` value and the
+        `dLambda` attributs should have the same format and the same number
+        of derivatives.
+
+        The derivatives of all coefficients are obtained from the coefficients
+        of each polynomial.
+
+        Depending of the number of terms, this appraoch may be faster than
+        using Vieta formula when the number of eigenvalue increases.
+
+        Parameters
+        ----------
+        C : CharPol
+            The second polynomial.
+
+        Returns
+        -------
+        P : CharPol
+            The results of the multiplcation of both CharPol.
+        """
+        if not isinstance(C, CharPol):
+            raise ValueError('`C` must be a CharPol object.')
+        # Need to check if both nu0 are the same
+        try:
+            if not np.allclose(self.nu0, C.nu0):
+                raise ValueError('Both polynomials must be obtained at the same `nu0`')
+        except AttributeError:
+            print('The attribut `nu0` should be defined and identical for both polynomial')
+        # Check derivatives order are the same
+        if self.dcoefs[0].shape != C.dcoefs[0].shape:
+            raise ValueError('The number of derivative should be the same for both polynomial')
+
+        total_order = len(self.dcoefs) + len(C.dcoefs) - 2
+        max_order = (len(self.dcoefs) - 1, len(C.dcoefs) - 1)
+        shape = self.dcoefs[0].shape
+        # Deduce the highest degrees for derivatives
+        N = np.array(shape) - 1
+
+        # Get factorial
+        F = np.asfortranarray(div_factorial(np.ones(shape, dtype=float)))
+        F1 = 1. / np.asfortranarray(div_factorial(np.ones(shape, dtype=float)))
+
+        dcoefs = []
+        # dcoefs are Taylor series, need to remove the factorial for the derivatives
+        C_dcoefs = [F1 * an for an in C.dcoefs]
+        S_dcoefs = [F1 * an for an in self.dcoefs]
+        # Compute the polynomial coef `dcoefs`
+        # In CharPol these coefs are in descending order such,
+        #    a_0 lda**N + ... + a_N lda**0
+        for order in range(total_order, -1, -1):
+            # Local coeff for summation
+            dcoefs_order = np.zeros(shape, dtype=complex)
+            # Get all combinaisons of with 2 coefficients to have exactly the given order
+            for index in two_composition(order, max_order):
+                # print(order, index, (max_order[0] - index[0], max_order[1] - index[1]))
+                # Compute the values derivative of the product
+                dcoefs_order += diffprodTree([S_dcoefs[max_order[0] - index[0]],
+                                              C_dcoefs[max_order[1] - index[1]]], N)
+            # dcoefs should be a Taylor series, need to divide by factorial
+            dcoefs.append(dcoefs_order * F)
+
+        # Merge both dLambda for the new instance
+        dLambda = []
+        dLambda.extend(self.dLambda.copy())
+        dLambda.extend(C.dLambda.copy())
+
+        return CharPol._from_dcoefs(dcoefs, dLambda, self.nu0)
+
+    def __mul__(self, other):
+        """Multiply this polynomial by another Charpol Object.
+
+        Shorthand or the `multiply` method.
+        """
+        return self.multiply(other)
 
     def EP_system(self, vals):
         """ Evaluate the successive derivatives of the partial characteristic
