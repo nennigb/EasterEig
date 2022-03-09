@@ -96,6 +96,29 @@ class Test_charpol_mult(unittest.TestCase):
             check_an[i] = np.allclose(an, bn)
         self.assertTrue(check_an.all())
 
+    def test_factory_from_recursive_mult(self):
+        """ Test that `_from_recursive_mult` yield same CharPol than Vieta.
+        """
+        extracted = self.extracted
+
+        # Create globals and partial CharPol
+        Cv = ee.CharPol(extracted[0:6])
+        Cr2 = ee.CharPol._from_recursive_mult(extracted[0:6], block_size=2)
+        Cr3 = ee.CharPol._from_recursive_mult(extracted[0:6], block_size=3)
+
+        # Check all polynomials have the same size
+        self.assertTrue(len(Cv.dcoefs) == len(Cr2.dcoefs))
+        self.assertTrue(len(Cv.dcoefs) == len(Cr3.dcoefs))
+
+        # Check values
+        check_r2 = np.zeros((len(Cv.dcoefs),), dtype=bool)
+        check_r3 = np.zeros((len(Cv.dcoefs),), dtype=bool)
+        for i, (an, bn, cn) in enumerate(zip(Cv.dcoefs, Cr2.dcoefs, Cr3.dcoefs)):
+            check_r2[i] = np.allclose(an, bn)
+            check_r3[i] = np.allclose(an, cn)
+        self.assertTrue(check_r2.all())
+        self.assertTrue(check_r3.all())
+
 if __name__ == '__main__':
     # run unittest test suite
     unittest.main()
