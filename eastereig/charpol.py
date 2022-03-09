@@ -30,6 +30,7 @@ derivatives of the selected set of eigenvalues.
 import numpy as np
 from numpy.linalg import norm
 import itertools as it
+from collections import deque
 from eastereig.eig import AbstractEig
 from eastereig.utils import _outer, diffprodTree, div_factorial, diffprodMV, two_composition
 import sympy as sym
@@ -80,33 +81,32 @@ class CharPol():
             Compute or not the CharPol coefficients using Vieta formula.
             Setting `vieta = False` can be useful for alternative constructors.
         """
-
-        if isinstance(dLambda[0], np.ndarray):
-            self.dLambda = dLambda
-            if nu0 is not None:
-                self.nu0 = nu0
-            else:
-                ValueError('If initialized by a list of array, nu0 is mandatory.')
-
-        elif isinstance(dLambda[0], AbstractEig):
-            self.dLambda = [np.array(vp.dlda) for vp in dLambda]
-            try:
-                # this attribute is created in `getDerivative*` method.
-                # check for it are handle error.
-                self.nu0 = dLambda[0].nu0
-            except:
-                raise ValueError('Need to call `getDerivative*` before init a CharPol instance.')
-        else:
-            TypeError('Unsupported type for dLambda elements.')
-
+        # Initial check on input are delegate
+        self.dLambda, self.nu0 = self._initial_init_checks(dLambda, nu0)
         # Compute the polynomial coef
         if vieta:
             self.dcoefs = self.vieta(self.dLambda)
             for i, c in enumerate(self.dcoefs):
                 self.dcoefs[i] = np.asfortranarray(div_factorial(c))
-
             # Finalize the instanciation
             self._finalize_init()
+
+    @staticmethod
+    def _initial_init_checks(dLambda, nu0):
+        """Perform initial checks on input parameters."""
+        if isinstance(dLambda[0], np.ndarray):
+            if nu0 is None:
+                raise ValueError('If initialized by a list of array, `nu0` is mandatory.')
+        elif isinstance(dLambda[0], AbstractEig):
+            try:
+                # Check for nu0. This attribute is created in `getDerivative*` method.
+                nu0 = dLambda[0].nu0
+            except AttributeError:
+                print('Need to call `getDerivative*` before init a CharPol instance.')
+            dLambda = [np.array(vp.dlda) for vp in dLambda]
+        else:
+            TypeError('Unsupported type for `dLambda` elements.')
+        return dLambda, nu0
 
     def _finalize_init(self):
         """Finalize CharPol initialization."""
@@ -144,6 +144,55 @@ class CharPol():
         C.dcoefs = dcoefs
         C._finalize_init()
         return C
+
+    @classmethod
+    def _from_recursive_mult(cls, dLambda, nu0=None, block_size=3):
+        """Define factory method to create recursively CharPol from the lambdas.
+
+        The methods is based on _divide and conquer_ approach. It combines
+        the Vieta's formulas and polynomial multiplications to speed up the
+        computation.
+
+        Parameters
+        ----------
+        dLambda : list
+           List of the derivatives of the eigenvalues used to build this object
+        nu0 : iterable
+            the value where the derivatives are computed
+        block_size : int, optional, default 3
+            The number of eigenvalue used in initial Vieta computation.
+
+        Returns
+        -------
+        CharPol
+            The new CharPol instance.
+        """
+        # Initial check on inputs and convert them to array
+        dLambda, nu0 = cls._initial_init_checks(dLambda, nu0)
+        # Create queue of dLambda block.
+        num_block = len(dLambda) // block_size
+        if num_block == 0:
+            # splitting require at least 1 block
+            num_block = 1
+        dLambda_blocks = np.array_split(dLambda, num_block)
+        block_list = deque(range(0, len(dLambda_blocks)))
+        # Create a dictionnary containing CharPol for each dLambda_blocks
+        # Vieta is used in each block
+        prod = dict()
+        for block, dLambda_in_block in zip(block_list, dLambda_blocks):
+            prod[block] = cls(dLambda_in_block, nu0)
+
+        # Consume the queue by computing the product of successive pairs
+        while len(block_list) > 1:
+            # Get 2 items from the left
+            pair = (block_list.popleft(), block_list.popleft())
+            # Add the pair to the right to consume it after
+            block_list.append(pair)
+            # Store the results in the dict
+            prod[pair] = prod[pair[0]] * prod[pair[1]]
+
+        # Return the final product
+        return prod[block_list[0]]
 
     def __repr__(self):
         """Define the representation of the class."""
