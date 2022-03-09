@@ -662,7 +662,7 @@ class CharPol():
         Returns
         -------
         x : array
-            The solution or None of NiterMax has been reach or if the
+            The solution or None of NiterMax has been reached or if the
             computation fail.
         """
 
@@ -671,7 +671,6 @@ class CharPol():
         x = np.array(x0)
         k = 0
         cond = True
-
         while cond:
             fx = f(x)
             if k == 0:
@@ -697,11 +696,12 @@ class CharPol():
         if k < NiterMax:
             return x
         else:
+            print('The maximal number of iteration has been reached.')
             return None
 
-    def newton_from_sol(self, x):
+    def newton_from_sol(self, x, **kargs):
         """Run newton fron a single starting point."""
-        return self._newton(self.EP_system, self.jacobian, x)
+        return self._newton(self.EP_system, self.jacobian, x, **kargs)
 
     def newton(self, bounds, Npts=5, decimals=6, max_workers=4, tol=1e-4, verbose=False):
         """ Mesh parametric space and run newton search on each point in
@@ -753,7 +753,7 @@ class CharPol():
         sol_ = np.array([s for s in all_sol if s is not None])
         # Use unique to remove duplicated row
         sol = np.unique(sol_.round(decimals=decimals), axis=0)
-        print(' > ', time.time() - tic, ' s in Newton solve.')
+        print('> ', time.time() - tic, ' s in Newton solve.')
         return sol
 
     def homotopy_solve(self, degree=None, tracktol=1e-5, finaltol=1e-10, singtol=1e-14,
@@ -800,6 +800,7 @@ class CharPol():
             The solutions of the system express as absolute value wtr to nu0.
             `r` is `None` if the computation has been aborted. If `oo_tol>0`,
             the number of rows may be less than `bplp`.
+            If `bplp > bplp_max`, `r` is None. 
         """
         # Convert to sympy
         p0, variables = self.taylor2sympyPol(self.dcoefs)
@@ -817,18 +818,21 @@ class CharPol():
         for i in range(1, len(variables)):
             polys.append(polys[i-1].diff(_lda))
 
-        # pypolsys solve
+        # Pypolsys solve
+        # generate sparse polynomial
         t0 = time.time()
-        sparse_pol = pypolsys.utils.fromSympy(polys)
-        pol = pypolsys.utils.toDense(*sparse_pol)
+        pol = pypolsys.utils.fromSympy(polys)
+        if dense:
+            pol = pypolsys.utils.toDense(*pol)
         part = pypolsys.utils.make_mh_part(n_var, [[i] for i in range(1, n_var+1)])
         pypolsys.polsys.init_poly(*pol)
         pypolsys.polsys.init_partition(*part)
 
         # Check if there is too much solution
         bplp = pypolsys.polsys.bezout(singtol)
-        print(' > Bezout number :', bplp)
+        print('> Bezout number :', bplp)
         if bplp > bplp_max:
+            print('  `bplp` > `bplp_max` ({}). Abort. Increase `bplp_max` and try again.'.format(bplp_max))
             return bplp, None
         else:
             bplp = pypolsys.polsys.solve(tracktol, finaltol, singtol)
@@ -838,7 +842,7 @@ class CharPol():
                 r[i+1, :] += nu
             # keep only finite solution, filter point at oo
             finite_sol = np.nonzero(np.abs(r[-1, :]) > oo_tol)
-            print(' > ', time.time() - t0, 's in homotopy solve. Found', bplp, 'solutions.')
+            print('> ', time.time() - t0, 's in homotopy solve. Found', bplp, 'solutions.')
             return bplp, r[:-1, finite_sol[0]].T
 
     @staticmethod
