@@ -352,7 +352,7 @@ def diffprodMV(dh, N):
     >>> d = diffprodMV(dh, (3,))
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
     True
-    
+
     """
     # TODO check type of N
     # Get the number of functions hi
@@ -439,7 +439,7 @@ def diffprodTree(dh, N):
     >>> d = diffprodTree(dh, (3,))
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
     True
-    
+
     """
     # create a queue to be consumed
     lda_list = deque(range(0, len(dh)))
@@ -469,9 +469,9 @@ def div_factorial(dH):
     Parameters
     ----------
     dH : ndarray
-        Contains the derivative of H with respect of each variable. 
+        Contains the derivative of H with respect of each variable.
         dH[3,2] means up dx**2 dy (H).
-        
+
     # TODO chnage into factorial matrix to avoid to recomputed...
     Returns
     -------
@@ -492,7 +492,7 @@ def _outer(*vs):
     """Compute the outer product of sequence of vectors.
 
     https://stackoverflow.com/questions/17138393/numpy-outer-product-of-n-vectors
-    
+
     Parameters
     ----------
     vs : tuple of iterable
@@ -672,21 +672,21 @@ def faaDiBruno(df, dg, N=None):
     r""" Compute the successive derivative of a composite function with
     Faa Di Bruno formula.
 
-    Expressed in terms of Bell polynomials Bn,k(x1,...,xn−k+1), this yields 
+    Expressed in terms of Bell polynomials Bn,k(x1,...,xn−k+1), this yields
     \[ d^{n} \over dx^{n}}f(g(x))=\sum _{k=1}^{n}f^{(k)}(g(x))\cdot B_{n,k}\left(g'(x),g''(x),\dots ,g^{(n-k+1)}(x)\right). \]
     see https://en.wikipedia.org/wiki/Fa%C3%A0_di_Bruno's_formula
 
     Parameters
     ----------
     df : array
-        value of df/dg computed at x0. By convention, df[0] is the function value 
+        value of df/dg computed at x0. By convention, df[0] is the function value
         (not the derivatives).
     dg : array
         values of dg/dx computed at x0. By convention, dg[0] is the function value
         (not the derivatives).
     N : int, optional
         The requested number of derivatives if less than `len(df)`
-    
+
     Returns
     -------
     dfog : array
@@ -744,6 +744,28 @@ def faaDiBruno(df, dg, N=None):
             dfog.append(dfog_)
 
     return dfog
+
+
+def complex_map(bounds=(-5-5j, 5+5j), N=30):
+    """Create a map of the complex plane between the bounds.
+
+    Parameters
+    ----------
+    bounds : tuple
+        The two corners on the map in the complex plane.
+    N : int
+        The number of points in each direction.
+
+    Returns
+    -------
+    np.array:
+        The complex coordinate of the points.
+    """
+    zr, zi = np.meshgrid(np.linspace(bounds[0].real, bounds[1].real, N),
+                         np.linspace(bounds[0].imag, bounds[1].imag, N))
+    return zr + 1j*zi
+
+
 # %% Main for basic tests
 if __name__ == '__main__':
     # run doctest Examples
