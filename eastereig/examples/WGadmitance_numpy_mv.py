@@ -399,7 +399,7 @@ def compute_approx_error(C, shift_modulus):
     # Prediction using just a single eig approx
     lda_T = np.zeros((Nlda,), dtype=complex)
     for n, dLambda in enumerate(C.dLambda):
-        Tlda = ee.charpol.Taylor(dLambda, C.nu0)
+        Tlda = ee.charpol.Taylor.from_derivatives(dLambda, C.nu0)
         lda_T[n] = Tlda.eval_at(nu_shift)
     # Error estimator : pick the Nlda // 2 minimal distances
     D_C = cdist(lda_bf[:Nlda, np.newaxis], lda_C[:, np.newaxis],
@@ -430,6 +430,9 @@ def compute_error_wtr_number_of_modes(extracted, step=2, rhov=np.linspace(0, 10,
             
     # plot the Error
     plt.figure('Error')
+    # Taylor
+    ERR_T[0, :]=1e-16
+    plt.plot(rhov, np.log10(ERR_T[:, 0]), linestyle=':', marker='+', label='$T_\lambda$')
     for n, N in enumerate(Nv):
         plt.plot(rhov, np.log10(ERR_C[:, n]), linestyle='-', marker='.', label='N='+str(Nv[n]))
     plt.legend()
@@ -438,11 +441,11 @@ def compute_error_wtr_number_of_modes(extracted, step=2, rhov=np.linspace(0, 10,
     
     # plt.figure('Error T')
     # for n, N in enumerate(Nv):
-    #     plt.plot(rhov, np.log10(ERR_T[:, n]), linestyle='-', marker='.', label='N='+str(Nv[n]))
+    #     plt.plot(rhov, np.log10(ERR_T[:, n]), linestyle=':', marker='.', label='N='+str(Nv[n]))
     # plt.legend()
     # plt.xlabel(r'$|\delta|$')
     # plt.ylabel(r'$\log_{10} E$')
-    return ERR_C
+    return ERR_C, ERR_T
 
 # %% Main
 if __name__ == '__main__':
@@ -488,7 +491,7 @@ if __name__ == '__main__':
     # N=5 -> move to function
     
     # number of mode to compute
-    Nmodes = 13
+    Nmodes = 11
 
     # Create discrete operator of the pb
     imp = Ynumpy(y=nu0, n=N, h=h, rho=rho0, c=c0, k=k0)
@@ -511,7 +514,8 @@ if __name__ == '__main__':
         vp.getDerivativesMV(Nderiv, imp)
 
     print('Create CharPol...')
-    C = ee.CharPol(extracted)
+    # C = ee.CharPol(extracted)
+    C = ee.CharPol._from_recursive_mult(extracted)
     
     # From analyical solution:
     alpha_s = 4.1969 - 2.6086j
@@ -559,7 +563,7 @@ if __name__ == '__main__':
     p0, variables = ee.CharPol.taylor2sympyPol(C.dcoefs, tol=1e-5)
     
     # %% Compute error
-    ERR_C = compute_error_wtr_number_of_modes(extracted, rhov=np.linspace(0, 10, 20))
+    ERR_C, ERR_T = compute_error_wtr_number_of_modes(extracted, rhov=np.linspace(0, 10, 20))
     
     # %% pypolsys solve
     is_pypolsys = False
