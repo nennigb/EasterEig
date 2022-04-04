@@ -729,6 +729,14 @@ class CharPol():
         -------
         sol : array
             The N 'unique' solutions for the M unknowns in a NxM array.
+
+        Remarks
+        -------
+        For parallel execution, consider using (before numpy import)
+        ```
+        import os
+        os.environ["OMP_NUM_THREADS"] = "1"
+        ```
         """
         # TODO May limit bounds by convergence radius ?
         tic = time.time()
