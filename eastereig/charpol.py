@@ -1304,24 +1304,53 @@ class CharPol():
 
 
 class Taylor:
-    """ Define a multivariate Taylor series.
+    r"""Define a multivariate Taylor series.
+
+    The series is defined as
+    \(T = \sum_{n_0, n_1, \dots} a_{n_0, n_1, \dots} \nu_0^{n_0}, \nu_1^{n_1} \dots\)
+    where the constant 0 order term is \(a_{0, 0, \dots}, 0\).
     """
 
     def __init__(self, an, nu0):
-        """ Initialize the object with df/d nu divided by factorial.
+        """Initialize the object with df/d nu divided by factorial.
+
+        Parameters
+        ----------
+        an : np.ndarray
+            The coefficients of the Taylor expansion.
+        nu0 : iterable
+            The value where the Taylor series is computed.
         """
         self.an = an
         self.nu0 = nu0
 
-    def __repr__(self):
-        """ Define the representation of the class
+    @classmethod
+    def from_derivatives(cls, dn, nu0):
+        """Instanciate Taylor object from the sucessive derivatives df/dnu.
+
+        Parameters
+        ----------
+        dn : array
+            The coefficients of the function derivatives wrt nu.
+        nu0 : iterable
+            The value where the derivatives are computed.
+
+        Returns
+        -------
+        Taylor
+            An new Taylor instance.
         """
+        an = div_factorial(dn)
+        return cls(an, nu0)
+
+    def __repr__(self):
+        """Define the representation of the class."""
         return "Instance of {} @nu0={} with #{} derivatives.".format(self.__class__.__name__,
                                                                      self.nu0,
                                                                      self.an.shape)
 
     def eval_at(self, nu):
-        """ Evaluate the Taylor series at nu with derivatives computed at nu0.
+        """Evaluate the Taylor series at nu with derivatives computed at nu0.
 
         Parameters
         ----------
@@ -1338,7 +1367,6 @@ class Taylor:
         nu = np.array(nu, dtype=complex) - np.array(self.nu0, dtype=complex)
         # Evaluate the polynomial
         return polyvalnd(nu, self.an)
-
 
     # def myroots(coef):
     #     """Provide a global interface for roots of polynom with variable coefficients.
