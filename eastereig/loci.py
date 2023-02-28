@@ -17,7 +17,9 @@
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-##Define the Loci class, that provides Riemann Surface plotting capability
+##Define the Loci class, that provides Riemann Surface plotting capability.
+
+The default back end is `matplotlib` but `pyvista` can be used if available.
 
 Example
 --------
@@ -340,6 +342,9 @@ class Loci:
             'w' allows to toogle to 'wireframe' representation
             's' allows to toogle to 'surface' representation
             'q' to quit.
+
+        If the differents surfaces are needed, they can be access to the
+        Plotter properties `_datasets`.
 
         Parameters
         -----------
