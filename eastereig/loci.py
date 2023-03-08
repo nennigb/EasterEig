@@ -224,7 +224,8 @@ class Loci:
 
         # Fancy plot
         if Title != 'empty':
-            Fig.canvas.set_window_title(Title)
+            # Fig.canvas.set_window_title(Title)  # Depreciated since mpl 3.4
+            Fig.canvas.manager.set_window_title(Title)
         ax.set_xlabel(r'$\mathrm{Re}\,' + variable + r' $')
         ax.set_ylabel(r'$\mathrm{Im}\,' + variable + r' $')
         if Type == 'Re':
