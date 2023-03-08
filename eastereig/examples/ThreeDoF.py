@@ -153,14 +153,14 @@ class ThreeDof(ee.OP):
         """Define the mass matrix of the 3 dof system."""
         M = np.array([[self.m_0[0],0.,0.],
                     [0.,self.m_0[1],0.],
-                    [0.,0.,self.m_0[2]]],dtype=np.complex)
+                    [0.,0.,self.m_0[2]]],dtype=complex)
         return M
 
     def _stiff(self,k):
         """Define the stiffness matrix of the 3 dof system."""
         K = np.array([[k[0]+k[3]+k[5],-k[3],-k[5]],
                     [-k[3],k[1]+k[3]+k[4],-k[4]],
-                    [-k[5],-k[4],k[2]+k[4]+k[5]]],dtype=np.complex)
+                    [-k[5],-k[4],k[2]+k[4]+k[5]]],dtype=complex)
         return K
     
     def _dmat1(self,n):
