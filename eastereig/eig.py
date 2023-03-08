@@ -181,7 +181,7 @@ class AbstractEig(ABC):
 
         if n == -1: n = len(self.dlda)
         # converting to np.array
-        dlda = np.array(self.dlda, dtype=np.complex)
+        dlda = np.array(self.dlda, dtype=complex)
         # get Taylor coef in ascending order
         Df = dlda[0:n] / sp.special.factorial(np.arange(n))
         # polyval require higher degree first
@@ -213,7 +213,7 @@ class AbstractEig(ABC):
         if n == -1: n= len(self.dlda)
 
         # converting to np.array
-        dlda = np.array(self.dlda, dtype=np.complex)
+        dlda = np.array(self.dlda, dtype=complex)
         # get Taylor coef in ascending order
         Df = dlda[0:n] / sp.special.factorial(np.arange(n))
         # order d(0) -> d(n) for padé
@@ -245,7 +245,7 @@ class AbstractEig(ABC):
             the Puiseux series evaluation of both eigenvalue
         """
         # if points.dtype
-        # points_ = points.astype(np.complex)
+        # points_ = points.astype(complex)
         try:
             ep.a
         except:
@@ -261,8 +261,8 @@ class AbstractEig(ABC):
         EP_loc = ep.EP_loc[index]
         a2 = a1.copy()
 
-        f1 = np.ones(points.shape, dtype=np.complex)*a1[0]
-        f2 = np.ones(points.shape, dtype=np.complex)*a1[0]
+        f1 = np.ones(points.shape, dtype=complex)*a1[0]
+        f2 = np.ones(points.shape, dtype=complex)*a1[0]
         for k in range(1, n):
             # reconstruct the 2 solutions
             f1 += a1[k]*np.power(points-EP_loc, k/2.)
@@ -410,7 +410,7 @@ class PetscEig(AbstractEig):
             self.addD(f['dlda'], None)
             self.x = None
         # other attributes
-        self.nu0 = np.complex(f['nu0'])
+        self.nu0 = complex(f['nu0'])
         self.lda = f['dlda'][0]
         self._lib = f['lib']
 
@@ -549,7 +549,7 @@ class PetscEig(AbstractEig):
             derivee = u[ind[0][1].getIndices()]
 
             if len(derivee) == 0:
-                derivee = np.array([0.], dtype=np.complex64)
+                derivee = np.array([0.], dtype=np.complex128)
             # send the non empty value to all process
             derivee = comm.allreduce(derivee, MPI.SUM)
             # get lda^(n)
@@ -614,7 +614,7 @@ class NumpyEig(AbstractEig):
             dx, x = None, None
         # add attribute
         self.addD(f['dlda'], dx)
-        self.nu0 = np.complex(f['nu0'])
+        self.nu0 = np.complex128(f['nu0'])
         self.lda = f['dlda'][0]
         self.x = x
         self._lib = f['lib']
@@ -650,8 +650,8 @@ class NumpyEig(AbstractEig):
         # bordered
         # ---------------------------------------------------------------------
         # Same matrix to factorize for all RHS
-        Zer = np.zeros(shape=(1, 1), dtype=np.complex)
-        Zerv = np.zeros(shape=(1,), dtype=np.complex)
+        Zer = np.zeros(shape=(1, 1), dtype=complex)
+        Zerv = np.zeros(shape=(1,), dtype=complex)
         Bord = sp.bmat([[L               , L1x.reshape(-1, 1)],
                         [v.reshape(1, -1), Zer]])  # reshape is to avoid (n,) in bmat
 
@@ -736,7 +736,7 @@ class ScipyspEig(AbstractEig):
             dx, x = None, None
         # add attribute
         self.addD(f['dlda'], dx)
-        self.nu0 = np.complex(f['nu0'])
+        self.nu0 = np.complex128(f['nu0'])
         self.lda = f['dlda'][0]
         self.x = x
         self._lib = f['lib']
@@ -767,7 +767,7 @@ class ScipyspEig(AbstractEig):
 
         # constrution du vecteur (\partial_\lambda L)x, ie L.L1x
         L1x = op.createDL_ldax(self)  # FIXME change, now with return
-        Zerv = np.zeros(shape=(1,), dtype=np.complex)
+        Zerv = np.zeros(shape=(1,), dtype=complex)
         # bordered
         # ---------------------------------------------------------------------
         # Same matrix to factorize for all RHS, conversion to scr for scipy speed
