@@ -1,21 +1,16 @@
 # -*- coding: utf-8 -*-
-
 # This file is part of eastereig, a library to locate exceptional points
 # and to reconstruct eigenvalues loci.
-
 # Eastereig is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
 # Eastereig is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
 # You should have received a copy of the GNU General Public License
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
-
 r"""
 ##Define the EP class
 
@@ -87,8 +82,7 @@ except:
 
 
 class EP:
-    """
-    Class to locate EP and get Puiseux expansion
+    """Class to locate EP and get Puiseux expansion.
 
     TODO Need a little clean up !
 
@@ -119,9 +113,7 @@ class EP:
     """
 
     def __init__(self, vp1, vp2):
-        """ Init method
-        """
-
+        """Init method."""
         # check that vp1 and vp2 are compute areound the same point nu0
         if vp1.nu0 != vp2.nu0:
             raise ValueError('Eigenvalues are not computed at the same point')
@@ -131,8 +123,7 @@ class EP:
         self._vp2dlda = vp2.dlda
 
     def __repr__(self):
-        """ Define the object representation
-        """
+        """Define the object representation."""
         try:
             EP_loc = self.EP_loc
             Err = self.aposterioriErr
@@ -146,13 +137,13 @@ class EP:
 
     @staticmethod
     def dlda2dh(dlda1, dlda2):
-        """ compute the n-th firts derivative of h = (lda_1-lda2)**2 from dlda1 and dlda2
+        """Compute the n-th firts derivative of h = (lda_1-lda2)**2 from dlda1 and dlda2.
 
         arxiv.org/abs/1909.11579 Eq. 7b
         use standard liebnitz rule and a compact version for symmetric terms
 
         Examples
-        ---------
+        --------
         >>> EP.dlda2dh([1,0.5,0.13,0.01],[3,0.1,0.05,0.015])
         array([ 4.   +0.j, -1.6  +0.j,  0.   +0.j,  0.212+0.j])
         """
@@ -161,9 +152,9 @@ class EP:
 
         N = len(dlda1)
         # init derivatives of each terms
-        dh1 = np.zeros(N, dtype=np.complex)
-        dh2 = np.zeros(N, dtype=np.complex)
-        dh12 = np.zeros(N, dtype=np.complex)
+        dh1 = np.zeros(N, dtype=complex)
+        dh2 = np.zeros(N, dtype=complex)
+        dh12 = np.zeros(N, dtype=complex)
         # init 1st terms (no derivation)
         dh1[0] = dlda1[0]**2
         dh2[0] = dlda2[0]**2
@@ -189,8 +180,8 @@ class EP:
 
     @staticmethod
     def Pmatrix(z0, N):
-        """ Compute the matrix P defined by equating each power of \\nu of the
-        Puiseux and Taylor expansions of the function g(\\nu)
+        r"""Compute the matrix P defined by equating each power of \nu of the
+        Puiseux and Taylor expansions of the function g(\nu).
 
         arxiv.org/abs/1909.11579 Eq. 13
 
@@ -213,7 +204,7 @@ class EP:
                [ 0.  +0.j ,  0.  +0.j ,  1.  +0.j ]])
 
         """
-        P = np.zeros((N, N), dtype=np.complex)
+        P = np.zeros((N, N), dtype=complex)
         for i in range(N):
             for j in range(i, N):
                 P[i, j] = binom(j, i)*(-z0)**(j-i)
@@ -308,9 +299,7 @@ class EP:
         return ao
 
     def _dh(self):
-        """
-        Compute T_h using truncated Taylor of lda1 and lda2
-        """
+        """Compute T_h using truncated Taylor of lda1 and lda2."""
         dh = EP.dlda2dh(self._vp1dlda, self._vp2dlda)
         # store
         self.dh = dh
@@ -318,17 +307,14 @@ class EP:
         self._dhTay = dh/factorial(np.arange(len(self.dh)))
 
     def _dg(self):
-        """
-        Compute T_g using truncated Taylor of lda1 and lda2
-        """
+        """Compute T_g using truncated Taylor of lda1 and lda2."""
         # compute the derivatives g**(n)
         self.dg = np.array(self._vp1dlda) + np.array(self._vp2dlda)
         # store also Taylor coeff
         self._dgTay = self.dg/factorial(np.arange(len(self.dg)))
 
     def _roots(self, tronc):
-        """
-        Compute the roots of Th and sort it in ascending order of modulus
+        """Compute the roots of Th and sort it in ascending order of modulus.
 
         Parameters
         ----------
@@ -348,8 +334,8 @@ class EP:
         return roots
 
     def locate(self, tol=1e-2, xi=0.95, tronc=0):
-        """
-        Compute the roots \( \\zeta_n \) of \( T_h^{N} \) the taylor expansion of h of order N.
+        r"""Compute the roots \( \\zeta_n \) of \( T_h^{N} \) the taylor expansion of h of order N.
+
         The Exceptional Point (EP) is/are one of these roots.
 
         Others roots which do not correspond to the EP are regularly arranged. They mostly seems to be
@@ -361,14 +347,14 @@ class EP:
           2. Check if they belong to the mean radius circle \( \\vert \zeta_n \\vert < \\xi R \)
 
         Parameters
-        -----------
+        ----------
         tol: float
             the tolerance value between N and N-1 roots. Default value 1e-2
         a: float
             coef to make more stringent the condition on the mean radius R. Default value 0.95
 
         Returns
-        --------
+        -------
         EP_loc: list
             the list of exceptional points
         """
@@ -400,10 +386,9 @@ class EP:
         return self.EP_loc
 
     def getPuiseux(self, index=0):
-        r""" Get Puiseux series coefficient at selected EP by `index`
+        r"""Get Puiseux series coefficient at selected EP by `index`.
 
         Compute first even and then odd terms.
-
 
         Parameters
         ----------
@@ -442,7 +427,7 @@ class EP:
         N = len(self.dg)
 
         # Even coefficients of the puiseux series
-        # Pmat0 = np.eye( N, dtype=np.complex)
+        # Pmat0 = np.eye( N, dtype=complex)
         PmatDeltaParam0_EP = EP.Pmatrix((self.nu0-EP_loc), N)
         dgTayCoef = self.dg / factorial(np.arange(N))
         # if Pmat0 = eye, no need inversion
@@ -459,7 +444,6 @@ class EP:
 
         return self.a
 
-
     def plotZeros(self, index=0, Title='empty', Couleur='k',
                   variable='\\nu', fig=-1):
         """
@@ -468,9 +452,8 @@ class EP:
         The Exceptional Point (EP) is one of these roots. Others roots which do not
         correspond to the EP are regularly arranged. They mostly seems to be
         localized on a circle.
-
         """
-        #fixme change the name !
+        # FIXME change the name !
         # check if EP have been found
         try:
             EP_loc = self.EP_loc
@@ -478,9 +461,10 @@ class EP:
             EP_loc = self.locate()
 
         def labelShift(G, X, shift):
-            """ compute the label shift to avoid overlay. if there is only on value, the angle is 0.
+            """Compute the label shift to avoid overlay. if there is only on value, the angle is 0.
 
-            First compute center of gravity G of the cluster of points, then place label along GX[i] using labelShift
+            First compute center of gravity G of the cluster of points, then
+            place label along GX[i] using `labelShift`.
 
             Parameters
             ----------
