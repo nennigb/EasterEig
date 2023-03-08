@@ -54,11 +54,13 @@ Dependencies
 `eastereig` is based on numpy (full) and scipy (sparse) for most internal computation and can handle _large_ parallel sparse matrices thanks to **optional** import of [petsc4py](https://petsc4py.readthedocs.io/en/stable/install.html) (and mumps), 
 [slepc4py](https://slepc4py.readthedocs.io/en/stable/install.html) and
 and [mpi4py](https://mpi4py.readthedocs.io/en/stable/install.html). As non-hermitian problems involve complex-valued eigenvalues, computations are realized with complex arithmetic and the **complex petsc version** is expected.
-Tested for python 3.5
+Tested for python >= 3.5
 
 > **Remarks :**
 > To run an example with petsc (parallel), you need to run python with `mpirun`. For instance, to run a program with 2 proc
 > `mpirun -n 2 python myprog.py`
+
+Riemann surface can also be plotted using the `Loci` class either with `matplotlib` or with [`pyvista`](https://github.com/pyvista/pyvista) (optional).
 
 Install 
 --------
