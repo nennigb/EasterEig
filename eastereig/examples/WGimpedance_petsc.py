@@ -68,9 +68,9 @@ Check also eigenvalue derivatives
 True
 
 To run an example with petsc in parallel, you need to run python with `mpirun`. For instance, to run this example with 2 proc:
->>> import subprocess
->>> out=subprocess.run("mpirun -n 2 python3 ./eastereig/examples/WGimpedance_petsc.py".split())
->>> out.returncode
+>>> import subprocess  # doctest: +SKIP
+>>> out=subprocess.run("mpirun -n 2 python3 ./eastereig/examples/WGimpedance_petsc.py".split())  # doctest: +SKIP
+>>> out.returncode # doctest: +SKIP
 0
 
 """
