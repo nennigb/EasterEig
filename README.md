@@ -18,7 +18,7 @@ The method requires the computation of successive derivatives of two selected ei
  * exceptional points (EP) localization, using standard root-finding algorithms; 
  * computation of the associated Puiseux series up to an arbitrary order.
   
-This representation, which is associated with the topological structure of Riemann surfaces, allows to efficiently approximate the selected pair in a certain neighbourhood of the EP.
+This representation, which is associated with the topological structure of Riemann surfaces, allows to efficiently approximate the selected pair in a certain neighborhood of the EP.
 
 To use this package :
 
@@ -57,7 +57,7 @@ and [mpi4py](https://mpi4py.readthedocs.io/en/stable/install.html). As non-hermi
 Tested for python >= 3.5
 
 > **Remarks :**
-> To run an example with petsc (parallel), you need to run python with `mpirun`. For instance, to run a program with 2 proc
+> To run an example with petsc (parallel), you need to run python with `mpirun` (or `mpiexec`). For instance, to run a program with 2 proc
 > `mpirun -n 2 python myprog.py`
 
 Riemann surface can also be plotted using the `Loci` class either with `matplotlib` or with [`pyvista`](https://github.com/pyvista/pyvista) (optional).
@@ -147,16 +147,16 @@ The problem has to be recast in the following form:
 \( \left[ \underbrace{1}_{f_0(\lambda)=1} \mathbf{K}_0(\nu) + \underbrace{\lambda(\nu)}_{f_1(\lambda)=\lambda} \mathbf{K}_1(\nu) + \underbrace{\lambda(\nu)^2}_{f_2(\lambda)} \mathbf{K}_2(\nu) \right] \mathbf{x} =  \mathbf{0} \).
 
 Matrices are then stacked in the variable `K`
-```
-K = [K0,K1,K2].
+```python
+K = [K0, K1, K2].
 ```
 **The functions** that return the derivatives with respect to \(\nu\) of each matrices have to be put in `dK`. The prototype of this function is fixed (the parameter n corresponds to the derivative order) to ensure automatic computation of the operator derivatives.
-```
-dK = [dK0,dK1,dK2].
+```python
+dK = [dK0, dK1, dK2].
 ```
 Finally, **the functions** that returns derivatives with respect to \( \lambda\) are stored in 'flda'
-```
-flda = [None,ee.lda_func.Lda,ee.lda_func.Lda2].
+```python
+flda = [None, ee.lda_func.Lda, ee.lda_func.Lda2].
 ```
 Basic linear and quadratic dependency are defined in the module `lda_func`. Others dependencies can be easily implemented; provided that the appropriate eigenvalue solver is also implemented). The `None` keyword is used when there is no dependency to the eigenvalue, e. g. \(\mathbf{K}_0\).
 
@@ -164,54 +164,51 @@ This formulation is used to automatically compute (i) the successive derivatives
 
 These variables are defined by creating **a subclass** that inherits from the eastereig **OP class**. For example, considering a generalized eigenvalue problem \( \left[\mathbf{K}_0(\nu) + \lambda \mathbf{K}_1(\nu) \right] \mathbf{x} =  \mathbf{0} \) :
 
-```
+```python
 import eastereig as ee
 
 class MyOP(ee.OP):
-    """ Create a subclass of the OP class to describe your problem
-    """
+    """Create a subclass of the OP class to describe your problem."""
+
     def __init__(self):
-        """ Initialize the problem       
-        """
-        
-        # initialize OP interface
+        """Initialize the problem."""
+        # Initialize OP interface
         self.setnu0(z)
-        
-        # mandatory -----------------------------------------------------------
-        self._lib='scipysp' # 'numpy' or 'petsc'
-        # create the operator matrices
-        self.K=self.CreateMatrix()
-        # define the list of function to compute the derivatives of each operator matrix
-        self.dK = [self.dmat0, self.dmat1]        
-        # define the list of functions to set the eigenvalue dependency of each operator matrix
-        self.flda = [None, ee.lda_func.Lda] 
+
+        # Mandatory -----------------------------------------------------------
+        self._lib = 'scipysp'  # 'numpy' or 'petsc'
+        # Create the operator matrices
+        self.K = self.CreateMyMatrix()
+        # Define the list of function to compute the derivatives of each operator matrix (assume 2 here)
+        self.dK = [self.dmat0, self.dmat1]
+        # Define the list of functions to set the eigenvalue dependency of each operator matrix
+        self.flda = [None, ee.lda_func.Lda]
         # ---------------------------------------------------------------------
 
-    def CreateMyMatrices(self,...):
-		""" Create my matrices and return a list
-		"""
- 		...
-    	return list_of_Ki
-    
-    def dmat0(self,n):
-		""" Return the matrix derivative with respect to nu
-		N.B. : The prototype of this function is fixed, the n parameter
-		stands for the derivative order. If the derivative is null,
-		the function returns the value 0.
-		"""
-		...
-		return dM0
-    
-    def dmat1(self,n):
-		""" Return the matrix derivative with respect to nu
-		N.B. : The prototype of this function is fixed, the n parameter
-		stands for the derivative order. If the derivative is null,
-		the function returns the value 0.
-		"""
-		...
-		return dM1
-    
-    
+    def CreateMyMatrices(self, ...):
+        """Create my matrices and return a list."""
+        ...
+        return list_of_Ki
+
+    def dmat0(self, n):
+        """Return the matrix derivative with respect to nu.
+
+        N.B. : The prototype of this function is fixed, the n parameter
+        stands for the derivative order. If the derivative is null,
+        the function returns the value 0.
+        """
+        ...
+        return dM0
+
+    def dmat1(self, n):
+        """Return the matrix derivative with respect to nu.
+
+        N.B. : The prototype of this function is fixed, the n parameter
+        stands for the derivative order. If the derivative is null,
+        the function returns the value 0.
+        """
+        ...
+        return dM1
 ```
 
 How to contribute ?
