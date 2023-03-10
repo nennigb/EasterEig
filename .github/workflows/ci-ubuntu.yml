@@ -1,11 +1,11 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# This workflow will install Python dependencies, run tests with a variety of Python versions
 
 name: CI-Ubuntu
 
 on:
   push:
     branches: [ '*' ]
-    paths-ignore:         # Don't trigger on files that are updated by the CI
+    paths-ignore:         # Skip CI in this case
       - README.md
   pull_request:
     branches: [ master ]
@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11']   
+        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11'] 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -48,11 +48,19 @@ jobs:
     - name: Install petsc and their dependencies (support for parallel matrices)
       run: |
         sudo apt update --yes
-        sudo apt-get install mpich --yes
+        # On 22.04 fails with mpich, but works on 20.04
+        # sudo apt-get install mpich libmpich-dev --yes
+        sudo apt install -y -q openmpi-bin libopenmpi-dev
         pip install mpi4py
         export PETSC_CONFIGURE_OPTIONS='--download-f2cblaslapack=1 --download-scalapack --download-mumps --with-scalar-type=complex'
         pip install petsc petsc4py
         pip install slepc slepc4py
     - name: Run test with petsc
       run: |
+        mpiexec --version
+        # No mpi call (check that it breaks nothing)
         python -m eastereig
+        # Explicit mpi call
+        mpiexec -n 2 python eastereig/examples/WGimpedance_petsc.py
+        
+       

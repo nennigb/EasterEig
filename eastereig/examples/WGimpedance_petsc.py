@@ -23,7 +23,7 @@ petsc/slepc version.
 
 ```
    y=h ____________________________ rigid wall / Neumann bc
-   
+
            | |
           -|-|-->     oo-duct
            | |
@@ -33,7 +33,7 @@ petsc/slepc version.
 ```
 
 Description
-------------    
+------------
 This problem is described in sec. 4.1 of arxiv.org/abs/1909.11579
 and yield a **generalized eigenvalue problem** and the eigenvalue lda stands for the axial wavenumber
 
@@ -68,34 +68,31 @@ Check also eigenvalue derivatives
 True
 
 To run an example with petsc in parallel, you need to run python with `mpirun`. For instance, to run this example with 2 proc:
->>> import subprocess
->>> out=subprocess.run("mpirun -n 2 python3 ./eastereig/examples/WGimpedance_petsc.py".split())
->>> out.returncode
+>>> import subprocess  # doctest: +SKIP
+>>> out=subprocess.run("mpirun -n 2 python3 ./eastereig/examples/WGimpedance_petsc.py".split())  # doctest: +SKIP
+>>> out.returncode # doctest: +SKIP
 0
+
 """
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division
+from scipy.special import factorial
+import numpy as np
+import eastereig as ee
+from petsc4py import PETSc
 import sys
 import slepc4py
 slepc4py.init(sys.argv)
 
-from petsc4py import PETSc
-from slepc4py import SLEPc
 Print = PETSc.Sys.Print
-
-import eastereig as ee
-import numpy as np
-import scipy as sp
-from scipy.special import factorial
-
 
 
 class Zpetsc(ee.OP):
     """Create a subclass of the interface class OP that describe the problem operator."""
 
-    def __init__(self,z,n,h,rho,c,k):
+    def __init__(self, z, n, h, rho, c, k):
         """Initialize the problem.
-        
+
         Parameters
         ----------
             z : complex
@@ -111,84 +108,86 @@ class Zpetsc(ee.OP):
             k : float
                 air wavenumber
         """
-
-        self.h=float(h)
-        self.n=n
+        self.h = float(h)
+        self.n = n
         # air properties
-        self.rho,self.c,self.k = rho, c, k
+        self.rho, self.c, self.k = rho, c, k
         # element length
-        self.Le= h/(n-1)
+        self.Le = h/(n-1)
 
         # assemble *base* matrices, independant of the parameter
-        self._mass() # create _Mmat
-        self._stif() # create _Kmat
+        self._mass()  # create _Mmat
+        self._stif()  # create _Kmat
         self._gam()  # create _GamMat
         # initialize OP interface
         self.setnu0(z)
-        
+
         # mandatory -----------------------------------------------------------
-        self._lib='petsc'
+        self._lib = 'petsc'
         # create the operator matrices
-        self.K=self._ImpMat()
+        self.K = self._ImpMat()
         # define the list of function to compute  the derivatives of each operator matrix
-        self.dK = [self._dstiff, self._dmass]        
+        self.dK = [self._dstiff, self._dmass]
         # define the list of function to set the eigenvalue dependance of each operator matrix
         self.flda = [None, ee.lda_func.Lda]
         # ---------------------------------------------------------------------
-  
-    # possible to add new methods
+
+    # Possible to add new methods
     def __repr__(self):
-        """Define the object representation.   
-        """
-        return "Instance of Operator class {} @nu0={} ({} dof, share with {} proc., height={})".format(self.__class__.__name__, self.nu0, self.n, PETSc.COMM_WORLD.getSize(),self.h)
-        
+        """Define the object representation."""
+        return "Instance of Operator class {} @nu0={} ({} dof, share with {} proc., height={})".format(self.__class__.__name__,
+                                                                                                       self.nu0, self.n,
+                                                                                                       PETSc.COMM_WORLD.getSize(),
+                                                                                                       self.h)
+
     def _mass(self):
-        """ Define the mass matrix, of 1D FEM with ordered nodes.
-        
+        """Define the mass matrix, of 1D FEM with ordered nodes.
+
         The elementary matrix reads
-        Me = (Le/6) * [2  1; 1 2]        
+        Me = (Le/6) * [2  1; 1 2]
         Thus the lines are [2,1,0], [1,4,1], [0,1,2] x (Le/6)
         """
-        
-        n=self.n
+        n = self.n
         # create M matrix (complex)
         M = PETSc.Mat().create()
         M.setSizes([n, n])
         M.setType('aij')
         M.setPreallocationNNZ(3)
-        M.setUp()    
-        
+        M.setUp()
+
         Istart, Iend = M.getOwnershipRange()
         i1 = Istart
-        if Istart==0: i1 = i1 + 1 # modify outside loop
+        if Istart == 0:
+            i1 = i1 + 1  # modify outside loop
         i2 = Iend
-        if Iend==n: i2 = i2 - 1   # modify outside loop
-        
+        if Iend == n:
+            i2 = i2 - 1   # modify outside loop
+
         # value for a inner M row [m1 m2 m1]
         m1 = self.Le / 6.
         m2 = self.Le * 4./6.
         # Interior grid points
-        for i in range(i1,i2):        
-            M[i,i-1] = m1
-            M[i,i]   = m2
-            M[i,i+1] = m1
+        for i in range(i1, i2):
+            M[i, i-1] = m1
+            M[i, i] = m2
+            M[i, i+1] = m1
 
         # Boundary points
-        if Istart==0:
-            M[0,0] = 2.*m1
-            M[0,1] = m1
-        if Iend==n:
-            M[n-1,n-2] = m1
-            M[n-1,n-1] = 2.*m1
+        if Istart == 0:
+            M[0, 0] = 2.*m1
+            M[0, 1] = m1
+        if Iend == n:
+            M[n-1, n-2] = m1
+            M[n-1, n-1] = 2.*m1
         # petsc will assemble the matrix
         M.assemble()
-        
+
         # store it
-        self._Mmat=M
-        
+        self._Mmat = M
+
     def _stif(self):
         """Define the stifness matrix of 1D FEM with ordered nodes.
-        
+
         The elementary matrix read
         Ke = (1/Le) * [1 -1; -1 1]
         Thus the lines are [1,-1,0], [-1,2,-1], [0,-1,1] x (1/Le)
@@ -199,98 +198,98 @@ class Zpetsc(ee.OP):
         K.setSizes([n, n])
         K.setType('aij')
         K.setPreallocationNNZ(3)
-        K.setUp() 
-        
+        K.setUp()
+
         # value for inner K row [k1 k2 k1]
-        k1 = -1. /self.Le
-        k2 =  2. /self.Le
-        
+        k1 = -1. / self.Le
+        k2 = 2. / self.Le
+
         # Striffness matrix
         Istart, Iend = K.getOwnershipRange()
         i1 = Istart
-        if Istart==0: i1 = i1 + 1 # modify outside loop
+        if Istart == 0:
+            i1 = i1 + 1  # modify outside loop
         i2 = Iend
-        if Iend==n: i2 = i2 - 1   # modify outside loop
-    
+        if Iend == n:
+            i2 = i2 - 1   # modify outside loop
+
         # Interior grid points
-        for i in range(i1,i2):        
-            K[i,i-1] = k1
-            K[i,i]   = k2
-            K[i,i+1] = k1
-    
+        for i in range(i1, i2):
+            K[i, i-1] = k1
+            K[i, i] = k2
+            K[i, i+1] = k1
+
         # Boundary points
-        if Istart==0:
-            K[0,0] = k2/2.
-            K[0,1] = k1
-        if Iend==n:
-            K[n-1,n-2] = k1
-            K[n-1,n-1] = k2/2.
+        if Istart == 0:
+            K[0, 0] = k2/2.
+            K[0, 1] = k1
+        if Iend == n:
+            K[n-1, n-2] = k1
+            K[n-1, n-1] = k2/2.
         # petsc will assemble the matrix
         K.assemble()
         # store it
-        self._Kmat=K
-        
+        self._Kmat = K
+
     def _gam(self):
-        """Define the Gamma matrix accounting for the impedance BC.
-        
-        Zeros everywhere except on the 1st node $\Gamma(0) = 1 $  
+        r"""Define the Gamma matrix accounting for the impedance BC.
+
+        Zeros everywhere except on the 1st node $\Gamma(0) = 1 $
         The matrix is created by converting a sparse matrix into full matrix
-        
+
         Parameters
         ----------
         z0 : complex
-            The impedance value 
+            The impedance value
         """
-
         n = self.n
         # create K and M matrix (complex)
         Gam = PETSc.Mat().create()
         Gam.setSizes([n, n])
         Gam.setType('aij')
         Gam.setPreallocationNNZ(1)
-        Gam.setUp()         
-        
+        Gam.setUp()
+
         # Striffness matrix
         """
         https://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/Mat/MatAssemblyBegin.html#MatAssemblyBegin
-        Space for preallocated nonzeros that is not filled by a call to MatSetValues() or a related routine are compressed out by assembly. 
+        Space for preallocated nonzeros that is not filled by a call to MatSetValues() or a related routine are compressed out by assembly.
         ie the pre allocted non initialized values are removed...
         """
         Istart, Iend = Gam.getOwnershipRange()
-        if Istart==0:
-            Gam[0,0] = 1.
+        if Istart == 0:
+            Gam[0, 0] = 1.
         # petsc will assemble the matrix
         Gam.assemble()
-        #store it
-        self._GamMat=Gam
-        
-            
+        # store it
+        self._GamMat = Gam
+
     def _ImpMat(self):
         """Return the operator matrices list for the generalized eigenvalue problem.
-        
+
         Returns
         -------
         K : matrix
            K contains [k0^2*M + Gamma*1i*const.rho0*omega/Z - K , -M]
         """
         omega = self.k * self.c    # angular freq.
-        Zeff =   1j * omega * self.rho / self.nu0
-        
-        K=[]
-        KK = self.k**2*self._Mmat + Zeff*self._GamMat - self._Kmat       
+        Zeff = 1j * omega * self.rho / self.nu0
+
+        K = []
+        KK = self.k**2*self._Mmat + Zeff*self._GamMat - self._Kmat
         # encapsulated into list
         K.append(KK)
         K.append(-self._Mmat)
-        
+
         return K
 
-    def _dstiff(self,n):
+    def _dstiff(self, n):
         r"""Define the sucessive derivative of the $\tilde{K}$ matrix with respect to nu.
-        
+
         L = \tilde{K}- lda M (standard FEM formalism)
         with polynomial formlism L = K0 + lda K1 + ...
         thus K0=\tilde{K}
-        
+
         Parameters
         ----------
         n : int
@@ -298,25 +297,25 @@ class Zpetsc(ee.OP):
         Returns
         -------
         Kn : Matrix (petsc or else)
-            The n-derivative of global K0 matrix 
+            The n-derivative of global K0 matrix
         """
-        if n==0:
-            Kn= self.K[0]
+        if n == 0:
+            Kn = self.K[0]
         else:
             omega = self.k * self.c    # angular freq.
             # derivative of (1/Z)
-            Zn= (-1)**n *factorial(n)/self.nu0**(n+1)
-            Kn= self._GamMat * 1j*self.rho*omega*Zn
-        
+            Zn = (-1)**n * factorial(n)/self.nu0**(n+1)
+            Kn = self._GamMat * 1j*self.rho*omega*Zn
+
         return Kn
-    
-    def _dmass(self,n):
+
+    def _dmass(self, n):
         """Define the sucessive derivative of the $M$ matrix with respect to nu.
-        
+
         L = K - lda M (standard FEM formalism)
         with polynomial formlism L = K0 + lda K1 + ...
         thus K1=-M
-        
+
         Parameters
         ----------
         n : int
@@ -327,15 +326,15 @@ class Zpetsc(ee.OP):
             The n-derivative of global K1 matrix
         """
         # if n=0 return M
-        if n==0:
+        if n == 0:
             return -self._Mmat
         # if n!= 0 return 0 because M is constant
-        else:            
+        else:
             return 0
 
 
 def main(N=5):
-    """ run the example
+    """Run the example.
 
     Parameters
     -----------
@@ -354,88 +353,83 @@ def main(N=5):
     import time
 
     # mpi communicator
-    comm=PETSc.COMM_WORLD.tompi4py()
+    comm = PETSc.COMM_WORLD.tompi4py()
     rank = comm.Get_rank()
-    # path to matlab    
-    path2matlab='../../'
     pi = np.pi
-    # Number of derivative 
-    Nderiv=12
+    # Number of derivative
+    Nderiv = 12
     # air properties
     rho0, c0 = 1.2, 340.
     # initial imepdance guess
-    #z0=400+3j
-    z0= 486.198103097114 + 397.605679264872j
+    # z0=400+3j
+    z0 = 486.198103097114 + 397.605679264872j
     # freq. of computation
     f = 200
     # modal index pair
-    n1=0
-    n2=1    
+    n1 = 0
+    n2 = 1
     # number of dof
     # N=5 -> move to function
     # duct height
     h = 1.
     # number of mode to compute
-    Nmodes=4
+    Nmodes = 4
     # solve the problem
     omega = 2*pi*f
     k0 = omega/c0
     # Create discrete operator of the pb
-    Imp=Zpetsc(z=z0,n=N,h=h,rho=rho0,c=c0,k=k0)
+    Imp = Zpetsc(z=z0, n=N, h=h, rho=rho0, c=c0, k=k0)
     print(Imp)
     Imp.createSolver(pb_type='gen')
-    Lambda = Imp.solver.solve(nev=Nmodes,target=0+0j,skipsym=False)
+    Lambda = Imp.solver.solve(nev=Nmodes, target=0+0j, skipsym=False)
     # return the eigenvalue and eigenvector in a list of Eig object
-    extracted = Imp.solver.extract( [n1,n2] )
+    extracted = Imp.solver.extract([n1, n2])
     # destroy solver (important for petsc/slepc)
     Imp.solver.destroy()
     print('> Eigenvalue :', Lambda)
-
 
     print('> Get eigenvalues derivatives ...\n')
     # Create Eig object
     vp1, vp2 = extracted
 
     Print('> Get derivative vp1 ...\n')
-    tic = time.time() # init timer 
-    vp1.getDerivatives(Nderiv,Imp)
-    Print("              derivative real time :", time.time()-tic)  
+    tic = time.time()  # init timer
+    vp1.getDerivatives(Nderiv, Imp)
+    Print("              derivative real time :", time.time()-tic)
     Print(vp1.dlda)
-    tic = time.time() # init timer 
-    vp2.getDerivatives(Nderiv,Imp)
-    Print("              derivative real time :", time.time()-tic) 
+    tic = time.time()  # init timer
+    vp2.getDerivatives(Nderiv, Imp)
+    Print("              derivative real time :", time.time()-tic)
     Print(vp2.dlda)
-    
-    # Locate EP 
-    EP1=ee.EP(vp1,vp2) 
-    if rank==0:
-        tic = time.time() # init timer
+
+    # Locate EP
+    EP1 = ee.EP(vp1, vp2)
+    if rank == 0:
+        tic = time.time()  # init timer
         loc = EP1.locate()[0]
         # print EP summary
         print(EP1)
         # compute puiseux series coefficients
         EP1.getPuiseux()
     else:
-        EP1=None
+        EP1 = None
     # share EP1 between all node
     EP1 = comm.bcast(EP1, root=0)
-    #print(EP1.EP_loc)
+    # print(EP1.EP_loc)
     return EP1, vp1
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     """Show graphical outputs and reconstruction examples."""
-
-    from matplotlib import pyplot as plt
 
     EP1, vp1 = main()
     # comm=PETSc.COMM_WORLD.tompi4py()
     # rank = comm.Get_rank()
 
     # compute reconstruction
-    N=5 # limit series order to 5 terms
-    points = np.linspace(-125,125,101) + EP1.nu0
-    tay = vp1.taylor(points,n=N)
-    pad = vp1.pade(points,n=N)
-    pui1,pui2 = vp1.puiseux(EP1,points,n=N)
-    ana1,ana2 = vp1.anaAuxFunc(EP1,points,n=N)
+    N = 5  # limit series order to 5 terms
+    points = np.linspace(-125, 125, 101) + EP1.nu0
+    tay = vp1.taylor(points, n=N)
+    pad = vp1.pade(points, n=N)
+    pui1, pui2 = vp1.puiseux(EP1, points, n=N)
+    ana1, ana2 = vp1.anaAuxFunc(EP1, points, n=N)
