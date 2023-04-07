@@ -61,7 +61,9 @@ def Lda(k, n, dlda):
     # k=0 nothing to du just return dlda[0]
     # to tackle mv modify with sum(k)
     if np.sum(k) == 0:
-        return dlda[0]
+        # Use asarray to avoid trouble between list, scalar, array
+        # TODO see if it the best way and uniformize the process
+        return np.asarray(dlda).flat[0]
     # by convention this terms is skipped (do not belong to RHS)
     if k == n:
         return 0
