@@ -45,22 +45,23 @@ jobs:
     - name: Run test without petsc
       run: |
         python -m eastereig
-    - name: Install petsc and their dependencies (support for parallel matrices)
-      run: |
-        sudo apt update --yes
-        # On 22.04 fails with mpich, but works on 20.04
-        # sudo apt-get install mpich libmpich-dev --yes
-        sudo apt install -y -q openmpi-bin libopenmpi-dev
-        pip install mpi4py
-        export PETSC_CONFIGURE_OPTIONS='--download-f2cblaslapack=1 --download-scalapack --download-mumps --with-scalar-type=complex'
-        pip install petsc petsc4py
-        pip install slepc slepc4py
-    - name: Run test with petsc
-      run: |
-        mpiexec --version
-        # No mpi call (check that it breaks nothing)
-        python -m eastereig
-        # Explicit mpi call
-        mpiexec -n 2 python eastereig/examples/WGimpedance_petsc.py
+#    # Since pip 23.1 trouble with pip installation of petsc4py        
+#    - name: Install petsc and their dependencies (support for parallel matrices)
+#      run: |
+#        sudo apt update --yes
+#        # On 22.04 fails with mpich, but works on 20.04
+#        # sudo apt-get install mpich libmpich-dev --yes
+#        sudo apt install -y -q openmpi-bin libopenmpi-dev
+#        pip install mpi4py
+#        export PETSC_CONFIGURE_OPTIONS='--download-f2cblaslapack=1 --download-scalapack --download-mumps --with-scalar-type=complex'
+#        pip install petsc petsc4py
+#        pip install slepc slepc4py
+#    - name: Run test with petsc
+#      run: |
+#        mpiexec --version
+#        # No mpi call (check that it breaks nothing)
+#        python -m eastereig
+#        # Explicit mpi call
+#        mpiexec -n 2 python eastereig/examples/WGimpedance_petsc.py
         
        
