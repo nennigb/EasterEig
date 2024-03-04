@@ -700,7 +700,7 @@ class CharPol():
             return None
 
     def newton_from_sol(self, x, **kargs):
-        """Run newton fron a single starting point."""
+        """Run newton from a single starting point."""
         return self._newton(self.EP_system, self.jacobian, x, **kargs)
 
     def newton(self, bounds, Npts=5, decimals=6, max_workers=4, tol=1e-4, verbose=False):
@@ -1116,6 +1116,8 @@ class CharPol():
         Remarks
         -------
         H is equal to the discriminant iff an=1, else need to multiply by an**(2*n -2).
+
+        # TODO add tests!
         """
         # TODO could it be adapted for multi parameter ?
         # it will allow to elimitate on variable and continue to use homotopy
@@ -1149,6 +1151,46 @@ class CharPol():
         # dH is the successive derivative, div by factorial to get TH
         TH = Taylor(div_factorial(dH), self.nu0)
         return TH
+
+    def associate_lda_to_nu(self, nu_ep, tol=1e-3):
+        """Associate a `nu` obtained with `getdH` to its lda.
+        
+        Solve the Chapol using nu and check with lda yield to multiple roots
+        using few NR steps. Direct appraoch based on `EP_system` fails due to
+        round of error.
+
+        Parameters
+        ----------
+        nu_ep : iterable or scalar
+            Vector or parameters identified as an EP.
+        tol : float, optional
+            The tolerance used in NR refinement.
+
+        Returns
+        -------
+        lda_ep : complex
+            The EP eigenvalue. If the methods fails, it returns `None`.
+        nu_ep : complex
+            The NR refined EP value. If the methods fails, it returns `None`.            
+        lda_ep_id : int
+            the index of the eigenvalue in the `Charpol` list.  If the methods
+            fails, it returns `None`.
+
+        # TODO add tests!
+        """
+        # Transform into tuple if scalar
+        if not hasattr(nu_ep, '__iter__'):
+            nu_ep = np.array((nu_ep,))
+        # Find all lda at ep
+        all_lda = np.roots(self.eval_an_at(nu_ep))
+        # All lda solve Charpol, but at EP d_lda Charpol also vanish
+        for i, ldai in enumerate(all_lda):
+            nr_sol = self.newton_from_sol((ldai, *nu_ep), tol=tol, normalized=True)
+            # Check if the refine sol correspond to the initial EP up to tol
+            if (np.abs(nr_sol[1:] - nu_ep)/np.abs(nu_ep)).max() < 10*tol:
+                lda_ep = ldai
+                return lda_ep, nr_sol[1:], i
+        return None, None, None
 
     def discriminant(self, nu):
         r""" Compute the discriminant from the coefficient and the Sylvester matrix.
