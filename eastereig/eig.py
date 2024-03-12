@@ -652,7 +652,7 @@ class NumpyEig(AbstractEig):
         # Same matrix to factorize for all RHS
         Zer = np.zeros(shape=(1, 1), dtype=complex)
         Zerv = np.zeros(shape=(1,), dtype=complex)
-        Bord = sp.bmat([[L               , L1x.reshape(-1, 1)],
+        Bord = np.bmat([[L, L1x.reshape(-1, 1)],
                         [v.reshape(1, -1), Zer]])  # reshape is to avoid (n,) in bmat
 
         # if N > 1 loop for higher order terms
