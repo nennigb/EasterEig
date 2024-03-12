@@ -29,7 +29,7 @@ and nu[2] the third.
 """
 
 # from . import fpolyval as fp
-from eastereig.fpoly import fpolyval
+from eastereig.fpoly import _fpolyval as fpolyval
 import numpy as np
 import numpy.polynomial.polyutils as pu
 from numpy.polynomial.polynomial import polyval
