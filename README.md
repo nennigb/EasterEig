@@ -1,6 +1,8 @@
 EasterEig
 =========
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) ![CI-Ubuntu](https://github.com/nennigb/EasterEig/workflows/CI-Ubuntu/badge.svg) [![pypi release](https://img.shields.io/pypi/v/eastereig.svg)](https://pypi.org/project/eastereig/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![CI-Ubuntu](https://github.com/nennigb/EasterEig/actions/workflows/ci-ubuntu.yml/badge.svg)](https://github.com/nennigb/EasterEig/actions/workflows/ci-ubuntu.yml) [![pypi release](https://img.shields.io/pypi/v/eastereig.svg)](https://pypi.org/project/eastereig/)
+
+
 
 Consider a parametric eigenvalue problem depending on a parameter \(\nu\). This arises for instance in
 
@@ -67,8 +69,16 @@ Install
 
 You'll need : 
 * python (tested for v >= 3.5);
+* python packages: numpy, setuptools, wheel
 * pip (optional).
+* fortran compiler (optional)
 Note that on ubuntu, you will need to use `pip3` instead of `pip` and `python3` instead of `python`. Please see the steps given in the continous integration script [workflows](.github/workflows/ci-ubuntu.yml).
+
+
+By default, the fortan evaluation of multivariate polynomial is desactivated. To enable it, set the environnement variable: `EASTEREIG_USE_FPOLY=True`. On ubuntu like system, run
+```console
+export EASTEREIG_USE_FPOLY=True
+```
 
 ### Using pip (preferred)
 Consider using `pip` over custom script (rationale [here](https://pip.pypa.io/en/stable/reference/pip_install/)). 
