@@ -68,12 +68,12 @@ Check eigenvalues
 True
 
 Get exceptional points location and check values
->>> EP1,EP2 = EPs
+>>> EP1, EP2 = EPs
 >>> EP1.locate()
 []
->>> res_EP2 = EP2.locate()[0]
+>>> res_EP2 = np.sort_complex(EP2.locate())[0]    # since cc
 >>> res_EP2
-(0.892616079814...+0.597704202996...j)
+(0.892616079814...-0.597704202996...j)
 
 Check eigenvalue reconstruction with Taylor, Padé, Puiseux and Analytic auxiliary functions
 >>> N = 6

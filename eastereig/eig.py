@@ -185,7 +185,7 @@ class AbstractEig(ABC):
         # get Taylor coef in ascending order
         Df = dlda[0:n] / sp.special.factorial(np.arange(n))
         # polyval require higher degree first
-        tay = sp.polyval(Df[::-1], points - self.nu0)
+        tay = np.polyval(Df[::-1], points - self.nu0)
 
         return tay
 
@@ -323,8 +323,8 @@ class AbstractEig(ABC):
             dhTay = ep._dhTay
 
         # evaluate Taylor series
-        mapg = sp.polyval(dgTay[::-1], points - self.nu0)
-        maph = sp.polyval(dhTay[::-1], points - self.nu0)
+        mapg = np.polyval(dgTay[::-1], points - self.nu0)
+        maph = np.polyval(dhTay[::-1], points - self.nu0)
         ldap = 0.5*(mapg+np.sqrt(maph))
         ldam = 0.5*(mapg-np.sqrt(maph))
         return ldap, ldam
@@ -652,7 +652,7 @@ class NumpyEig(AbstractEig):
         # Same matrix to factorize for all RHS
         Zer = np.zeros(shape=(1, 1), dtype=complex)
         Zerv = np.zeros(shape=(1,), dtype=complex)
-        Bord = sp.bmat([[L               , L1x.reshape(-1, 1)],
+        Bord = np.bmat([[L, L1x.reshape(-1, 1)],
                         [v.reshape(1, -1), Zer]])  # reshape is to avoid (n,) in bmat
 
         # if N > 1 loop for higher order terms
