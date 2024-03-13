@@ -23,7 +23,7 @@ Due to the possibly hudge number of polynomial evaluation, fortran implementatio
 is provided.
 
 All evaluations are performed for *complex* argument nu.
-In all cases the coefficients given in the array a
+In all cases the coefficients given in the array `a`
 the variable nu[0] is associated the `a` 1st dimension, nu[1] the second,
 and nu[2] the third.
 """
@@ -43,7 +43,7 @@ def polyvalnd(nu, a):
     constant and a[-1,..., -1] is the highest degree term.
     The ordering is the same as `numpy.polynomial.polynomial`.
 
-    It uses Horner method and map the fortran functions from `fpolyval.f90`
+    It uses Horner's method and map the fortran functions from `fpolyval.f90`
     if #nu <= 4. For higher number of variables, `numpy.polynomial.polynomial`
     is used.
 

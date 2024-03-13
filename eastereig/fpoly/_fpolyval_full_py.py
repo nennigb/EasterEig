@@ -23,7 +23,7 @@ If fortran compiler is available, consider `fpolyval` fortran version for
 speed up polynomial evalations (see README for details).
 
 All evaluations are performed for *complex* argument nu.
-In all cases the coefficients given in the array a
+In all cases the coefficients given in the array `a`
 the variable nu[0] is associated the `a` 1st dimension, nu[1] the second,
 and nu[2] the third.
 """
@@ -38,9 +38,9 @@ def polyvalnd(nu, a):
     This module uses the series' convention, ie considering a polynomial such
     P = sum_{i,...,k} a_i..k nu[0]**i ... nu[k]**k, the term a_00 is the
     constant and a[-1,..., -1] is the highest degree term.
-    The ordering is the same as numpy.polynomial.polynomial.
+    The ordering is the same as `numpy.polynomial.polynomial`.
 
-    It uses Horner method from `numpy.polynomial.polynomial`.
+    It uses Horner's method from `numpy.polynomial.polynomial`.
 
     Parameters
     ----------

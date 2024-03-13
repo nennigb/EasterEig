@@ -17,7 +17,7 @@
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Select the the good polynomial module (fast fortran full python fallback version).
+Select the good polynomial module (fast fortran full python fallback version).
 Neither `_fpolyval_full_py.py`, nor `_fpolyval.cpython-xxx.so`
 are supposed to be imported directly. One must use the `fpoly` module.
 
