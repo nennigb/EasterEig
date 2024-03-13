@@ -13,13 +13,14 @@ on:
     # * is a special character in YAML so you have to quote this string
     # run at 02:01 on the 10th of each month
     - cron:  '1 2 10 * *'     
-
+  
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11'] 
+        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11']
+        EASTEREIG_USE_FPOLY: ['True', 'False']
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -32,6 +33,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        pip install numpy setuptools wheel
     # - name: Lint with flake8
     #   run: |
     #     pip install flake8
@@ -42,9 +44,12 @@ jobs:
     - name: Install the package
       run: |
         pip install -e .
+        # Check if .so is there
+        ls -lrt eastereig/fpoly
     - name: Run test without petsc
       run: |
         python -m eastereig
+        python -c "from eastereig.fpoly import polyvalnd"
 #    # Since pip 23.1 trouble with pip installation of petsc4py        
 #    - name: Install petsc and their dependencies (support for parallel matrices)
 #      run: |

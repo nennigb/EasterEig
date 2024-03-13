@@ -15,6 +15,7 @@
 
 # You should have received a copy of the GNU General Public License
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
+
 r"""
 EasterEig  -- A library to locate exceptional points and to reconstruct eigenvalues loci
 ========================================================================================
@@ -30,7 +31,7 @@ EasterEig  -- A library to locate exceptional points and to reconstruct eigenval
 .. image::../../figures/packages.svg
 
 """
-import importlib as _importlib
+from importlib.util import find_spec as _find_spec
 import numpy as _np
 import os
 
@@ -38,13 +39,11 @@ import os
 __all__ = ['OP', 'Eig', 'EP', 'Loci', 'gopts']
 
 # check if petsc4py and slepc4py are installed
-if _importlib.util.find_spec('petsc4py'):
-    if _importlib.util.find_spec('slepc4py'):
+if _find_spec('petsc4py'):
+    if _find_spec('slepc4py'):
         _petscHere = True
 else:
     _petscHere = False
-
-# link to version
 
 
 def _getversion():
@@ -71,7 +70,7 @@ _CONST = _np.array([4.715922776012983e+257+2.3562408023262842e+251j,
                     6.013470016991616e-154+9.5500162705244384e-260j]).tobytes()
 
 
-# import class
+# Import class
 from .options import gopts
 from .eig import Eig
 from .op import OP
