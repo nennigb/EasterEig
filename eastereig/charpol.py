@@ -44,7 +44,7 @@ import pickle
 # /!\ numpy.polynomial.polynomial.polyval != np.polyval
 # from numpy.polynomial.polynomial import polyval
 # import numpy.polynomial.polyutils as pu
-from eastereig.fpoly.fpoly import polyvalnd
+from eastereig.fpoly import polyvalnd
 import pypolsys
 
 
