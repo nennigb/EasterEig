@@ -76,4 +76,5 @@ from .eig import Eig
 from .op import OP, OPmv
 from .ep import EP
 from .loci import Loci
+from .charpol import CharPol
 from . import lda_func
