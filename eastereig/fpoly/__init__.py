@@ -29,3 +29,12 @@ try:
 except ImportError:
     # Python fallback version
     from ._fpolyval_full_py import polyvalnd
+
+# Add the imported function to doctest
+__test__ = {'polyvalnd': """
+            >>> import doctest
+            >>> doctest.run_docstring_examples(polyvalnd, globals())
+            """}
+
+# Usefull for import * and to add it to doctring for pdoc
+__all__ = ['polyvalnd']
