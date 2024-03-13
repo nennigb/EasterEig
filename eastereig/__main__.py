@@ -17,19 +17,22 @@
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Run the doctest.
+# Test suite runner
+
+Run `eastereig` run the test suite using `doctest` and `unittest` framework.
 
 Example
 -------
-```
+```console
 python3 -m eastereig
 ```
 """
+import unittest
 import doctest
 import sys
 import numpy as np
 from eastereig import _petscHere
-# immport the file containing the doctest
+# Import the file containing the doctest
 from eastereig.examples import WGimpedance_numpy
 from eastereig.examples import WGimpedance_scipysp
 from eastereig.examples import ThreeDoF
@@ -39,6 +42,7 @@ from eastereig import ep
 from eastereig import lda_func
 from eastereig import eigSolvers
 from eastereig import fpoly
+from eastereig import charpol
 
 # Numpy 2.0 change default printing options making doctest failing.
 # https://numpy.org/neps/nep-0051-scalar-representation.html
@@ -49,34 +53,31 @@ if np.lib.NumpyVersion(np.__version__) >= '2.0.0b1':
 if _petscHere:
     from eastereig.examples import WGimpedance_petsc
 
-# invoke the testmod function to run tests contained in docstring
+# Explicitely list modules with doctest
 mod_list = [lda_func, utils, loci, ep, eigSolvers, WGimpedance_numpy,
-            WGimpedance_scipysp, ThreeDoF, fpoly]
+            WGimpedance_scipysp, ThreeDoF, fpoly, charpol]
 if _petscHere:
     petsc_list = [WGimpedance_petsc]
     mod_list.extend(petsc_list)
 
 if __name__ == '__main__':
+    import os
+    tests_dir = os.path.join(os.path.dirname(__file__), 'tests')
+    print('> Running tests...')
     Stats = []
+    # Create test suite for unittest and doctest
+    suite = unittest.TestLoader().discover(start_dir=tests_dir, pattern='test*.py')
+    # Add doctest from all modules of mod_list
     for mod in mod_list:
-        print("--------------------------------------------------------- \n",
-              "> Testing :  {} \n".format(mod.__name__),
-              "--------------------------------------------------------- \n ")
-        # possible to use the directive "# doctest: +ELLIPSIS" or optionflags=doctest.ELLIPSIS in testmod
-        # it enable the ellipsis '...' for truncate expresion. usefull for float (but be careful)
-        stat = doctest.testmod(m=mod, optionflags=doctest.ELLIPSIS, verbose=False)  # name=mod.__name__, verbose=True
-        print(stat)
-        Stats.append(stat)
-
-    # Summary, with petsc out put sometime hard to read
+        suite.addTest(doctest.DocTestSuite(mod,
+                                            optionflags=(doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE)))
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite)
+    # Summary, with petsc output is sometime hard to read
     print("\n", "================ Testing summary ===================")
-    for i, mod in enumerate(mod_list):
-        print(" > Testing :  {}".format(mod.__name__))
-        print("    ", Stats[i])
-    if sum([i.failed for i in Stats]) == 0:
-        print("                                            Pass :-)")
+    if result.wasSuccessful():
+        print("                                             Pass :-)")
         sys.exit(0)
     else:
-        print("                                          Failed :-(")
+        print("                                           Failed :-(")
         sys.exit(1)
-    print("====================================================")
