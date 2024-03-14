@@ -26,7 +26,7 @@ from eastereig.examples.WGadmitance_numpy_mv import Ynumpy
 
 
 class Test_charpol_mult(unittest.TestCase):
-    """ Define multinomial multiindex coefficients test cases.
+    """Define multinomial multiindex coefficients test cases.
     """
     @classmethod
     def setUpClass(cls):
@@ -65,7 +65,7 @@ class Test_charpol_mult(unittest.TestCase):
         self.imp = imp
 
     def test_charpol_mult_same_direct_computation(self):
-        """ Test that `multiply` yield same results that direct computation.
+        """Test that `multiply` yield same results that direct computation.
         """
         extracted = self.extracted
 
@@ -118,6 +118,7 @@ class Test_charpol_mult(unittest.TestCase):
             check_r3[i] = np.allclose(an, cn)
         self.assertTrue(check_r2.all())
         self.assertTrue(check_r3.all())
+
 
 if __name__ == '__main__':
     # run unittest test suite
