@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
 
-""" Test with sympy the computation of multinomial_multiindex_coefficients.
+"""Test with sympy the computation of multinomial_multiindex_coefficients.
 """
 
 import unittest
@@ -29,20 +29,18 @@ except ImportError:
 
 
 class Test_multinomial_multiindex_coefficients(unittest.TestCase):
-    """ Define multinomial multiindex coefficients test cases.
+    """Define multinomial multiindex coefficients test cases.
     """
     @classmethod
     def setUpClass(cls):
         print('\n> Tests of ', cls.__name__)
 
     def setUp(self):
-
         sym.init_printing(forecolor='White')
 
     def test_product_of_2_func(self):
-        """ Test multinomial_multiindex_coefficients with a product of 2 functions.
+        """Test multinomial_multiindex_coefficients with a product of 2 functions.
         """
-
         N = (2, 3)
         x, y = sym.symbols('x, y')
         f, g = sym.Function('f')(x, y), sym.Function('g')(x, y)
@@ -62,7 +60,7 @@ class Test_multinomial_multiindex_coefficients(unittest.TestCase):
         self.assertTrue(d_ == d)
 
     def test_product_of_3_func(self):
-        """ Test multinomial_multiindex_coefficients with a product of 3 functions.
+        """Test multinomial_multiindex_coefficients with a product of 3 functions.
         """
         N = (2, 3)
         x, y = sym.symbols('x, y')
@@ -84,7 +82,7 @@ class Test_multinomial_multiindex_coefficients(unittest.TestCase):
         self.assertTrue(d_ == d)
 
     def test_diffprodMV_and_diffprodTreeMV(self):
-        """ Test the computation derivative of multivariate product of functions.
+        """Test the computation derivative of multivariate product of functions.
 
         example : H = (x*y**2) * exp(x*y) @ x=0.5, y=1.5
         """
