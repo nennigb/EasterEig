@@ -28,7 +28,7 @@ from functools import reduce
 
 
 def two_composition(order, max_order):
-    r"""Yields all the 2-compostion of `order` with list of two integers.
+    r"""Yield all the 2-compostion of `order` with list of two integers.
 
     Whereas for _partition_, the order matter. This combinatoric generator
     could be used to get all terms of a given order in the multiplcation of
@@ -96,15 +96,15 @@ def multinomial_index_coefficients(m, n):
     Adapted from sympy sympy/ntheory/multinomial.py to return sorted index (speed up)
     to be sure that the first index is changing slowly
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     m : int
         Number of variable
     n: int
         Power
 
     Returns
-    --------
+    -------
     mindex : list
         Containing all tuple (k1,k2,..,km).
     mcoef : list
@@ -178,7 +178,7 @@ def multinomial_index_coefficients(m, n):
 
 
 def multinomial_multiindex_coefficients(m, N):
-    """ Compute the multinomial coefficients and indexes for multi-index.
+    """Compute the multinomial coefficients and indexes for multi-index.
 
     It appear in multivariable Liebnitz formula to compute derivatives like
     in (f*g*h)(x, y)^(N), where N is a tuple containing the order of derivation
@@ -191,15 +191,15 @@ def multinomial_multiindex_coefficients(m, N):
         means [(df/dx0, dfdy0), (dg/dx3, dgdy5)], [(df/dx0, dfdy1), (dg/dx3, dgdy4)], ... ]
       - The product of the multinomial coefficients.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     m : integer
         Number of functions.
     N: tuple
         Contains the integer (derivative order) for all variables.
 
     Returns
-    --------
+    -------
     multi_multi_index : list
         Containing all tuple (n1, n1, .., n_m).
     multi_multi_coef : list
@@ -237,19 +237,20 @@ def multinomial_multiindex_coefficients(m, N):
 
 
 def sortdict(adict):
-    """ Return a list the sorted keys and the associated list of value.
+    """Return a list the sorted keys and the associated list of value.
     """
     keys = adict.keys()
     sorted_keys = sorted(keys)
     return sorted_keys, [adict[key] for key in sorted_keys]
 
+
 # TODO : depreciated
 def diffprod(dh, N):
-    r"""Compute the n-th derivative of a product of function hi knowing the hi**(k).
+    r"""Compute the n-th derivative of a product of function hi knowing the hi**(k)
     depending on a single variable.
 
     For instance, if H(x) = h0*h1*h2*...*h_(M-1) we want to compute
-    H**(n) = (h0*h1*h2*...)**(n) with n<N
+    H^(n) = (h0*h1*h2*...)^(n) with n<N
 
     This function use the generalized Liebnitz rule.
 
@@ -262,7 +263,7 @@ def diffprod(dh, N):
         Number of requested derivatives
 
     Returns
-    --------
+    -------
     DH : list
         Contains the successive derivative of H. It is noteworthy that factorial
         are not included. DH is not a Taylor series.
@@ -270,7 +271,7 @@ def diffprod(dh, N):
     Exemples
     --------
     Let us consider a product of 2 function such,
-    H = h0 * h1 with h0 = x**2, h1 = exp(x) @ x=1
+    H = h0 * h1 with h0 = x^2, h1 = exp(x) @ x=1
     >>> dh = [np.array([1, 2*1, 2, 0, 0]), np.exp(1)*np.ones((5,))]
     >>> dh_ref = np.array([2.71828182845905, 8.15484548537714, 19.0279727992133, 35.3376637699676])
     >>> d = diffprod(dh, 4)
@@ -312,11 +313,11 @@ def diffprod(dh, N):
 
 def diffprodMV(dh, N):
     r"""Compute the n-th derivative of a product of function hi knowing the
-    hi**(k), depending on a single variable (if N is an int) or of multiple
+    hi^(k), depending on a single variable (if N is an int) or of multiple
     variables (N is a tuple).
 
     For instance, if H(x) = h0*h1*h2*...*h_(M-1) we want to compute
-    H**(n) = (h0*h1*h2*...)**(n) with n<N
+    H^(n) = (h0*h1*h2*...)^(n) with n<N
 
     This function use the generalized Liebnitz rule.
 
@@ -331,7 +332,7 @@ def diffprodMV(dh, N):
         for each variable.
 
     Returns
-    --------
+    -------
     DH : list
         Contains the successive derivatives of H with respect to all the variable.
         The output is ndarray whom dimensions follow N order. It is noteworthy that
@@ -340,7 +341,7 @@ def diffprodMV(dh, N):
     Exemples
     --------
     Multivariate example are available in the 'tests' folder.
-    Let us consider H = h0 * h1 with h0 = x**2, h1 = exp(x) @ x=1
+    Let us consider H = h0 * h1 with h0 = x^2, h1 = exp(x) @ x=1
     >>> dh = [np.array([1, 2*1, 2, 0, 0]), np.exp(1)*np.ones((5,))]
     >>> dh_ref = np.array([2.71828182845905, 8.15484548537714, 19.0279727992133, 35.3376637699676])
     >>> d = diffprodMV(dh, (3,))
@@ -362,7 +363,7 @@ def diffprodMV(dh, N):
     mv = len(N) != 1
 
     # init DH of all h_i (no derivative)
-    DH = np.zeros(np.array(N)+1, dtype=np.complex)
+    DH = np.zeros(np.array(N)+1, dtype=complex)
     # Create the generator
     if mv:
         # for multivariable case
@@ -397,11 +398,11 @@ def diffprodMV(dh, N):
 
 def diffprodTree(dh, N):
     r"""Compute the n-th derivative of a product of function hi knowing the
-    hi**(k), depending on a single variable (if N is an int) or of multiple
+    hi^(k), depending on a single variable (if N is an int) or of multiple
     variables (N is a tuple).
 
     For instance, if H(x) = h0*h1*h2*...*h_(M-1) we want to compute
-    H**(n) = (h0*h1*h2*...)**(n) with n<N
+    H^(n) = (h0*h1*h2*...)^(n) with n<N
 
     This function use the generalized Liebnitz rule by pair using a queue.
     This approach is faster that `diffprod` when the number of function is
@@ -418,7 +419,7 @@ def diffprodTree(dh, N):
         for each variable.
 
     Returns
-    --------
+    -------
     DH : list
         Contains the successive derivatives of H with respect to all the variable.
         The output is ndarray whom dimensions follow N order. It is noteworthy that
@@ -427,7 +428,7 @@ def diffprodTree(dh, N):
     Exemples
     --------
     Multivariate example are available in the 'tests' folder.
-    Let us consider H = h0 * h1 with h0 = x**2, h1 = exp(x) @ x=1
+    Let us consider H = h0 * h1 with h0 = x^2, h1 = exp(x) @ x=1
     >>> dh = [np.array([1, 2*1, 2, 0, 0]), np.exp(1)*np.ones((5,))]
     >>> dh_ref = np.array([2.71828182845905, 8.15484548537714, 19.0279727992133, 35.3376637699676])
     >>> d = diffprodTree(dh, (3,))
@@ -463,7 +464,7 @@ def diffprodTree(dh, N):
 diffprodTreeMV = diffprodTree
 
 def div_factorial(dH):
-    """ Convert Multivariate derivation matrix to Taylor series by dividing
+    """Convert Multivariate derivation matrix to Taylor series by dividing
     by the factorial coeff.
 
     Parameters
@@ -504,7 +505,8 @@ def _outer(*vs):
 def pade(an, m, n=None):
     """
     Return Pade approximation to a polynomial as the ratio of two polynomials.
-    version coming from scipy 1.4, previous version doesn't support complex
+
+    Version coming from scipy 1.4, previous version doesn't support complex
     with modify test case to check complex behaviour
     [scipy.interpolate](https://github.com/scipy/scipy/blob/master/scipy/interpolate/_pade.py)
 
@@ -567,8 +569,9 @@ def pade(an, m, n=None):
 # Define named tupled to manipulate Bell polynomials
 Bell = namedtuple('Bell', 'len coef pow')
 
+
 def _partialBellPoly(N, K):
-    r""" Compute partial Bell polynomials.
+    r"""Compute partial Bell polynomials.
 
     These polynomials appear in the computation of derivatives of composite function.
 
@@ -622,9 +625,8 @@ def _partialBellPoly(N, K):
                     [0, 1, 0, 1, 0, 0],
                     [1, 0, 0, 0, 1, 0]], dtype=int32))
     """
-
     # Init output results
-    B = np.empty((N+1, N+1), dtype=np.object)
+    B = np.empty((N+1, N+1), dtype=object)
 
     # Create 0 bell polynomials
     b0 = Bell(0, np.array([0]), np.zeros((1, N), dtype=np.int32))
@@ -669,11 +671,11 @@ def _partialBellPoly(N, K):
 
 
 def faaDiBruno(df, dg, N=None):
-    r""" Compute the successive derivative of a composite function with
+    r"""Compute the successive derivative of a composite function with
     Faa Di Bruno formula.
 
     Expressed in terms of Bell polynomials Bn,k(x1,...,xn−k+1), this yields
-    \[ d^{n} \over dx^{n}}f(g(x))=\sum _{k=1}^{n}f^{(k)}(g(x))\cdot B_{n,k}\left(g'(x),g''(x),\dots ,g^{(n-k+1)}(x)\right). \]
+    $${d^{n} \over dx^{n}}f(g(x))=\sum _{k=1}^{n}f^{(k)}(g(x))\cdot B_{n,k}\left(g'(x),g''(x),\dots ,g^{(n-k+1)}(x)\right). $$
     see https://en.wikipedia.org/wiki/Fa%C3%A0_di_Bruno's_formula
 
     Parameters
@@ -695,8 +697,8 @@ def faaDiBruno(df, dg, N=None):
 
     Examples
     --------
-    Compute the 4 first derivatives of the composite function exp(x)**2 at x=1.
-    Let be f = g**2 and g(x) = exp(x).
+    Compute the 4 first derivatives of the composite function exp(x)^2 at x=1.
+    Let be f = g^2 and g(x) = exp(x).
     Define `df` the successive derivative of f with respect to g.
     Define `dg` the (constant) successive derivative of g with respect to x.
     >>> ref = np.array([7.38905609893065, 14.7781121978613, 29.5562243957226, 59.1124487914452, 118.224897582890])
@@ -707,7 +709,7 @@ def faaDiBruno(df, dg, N=None):
     >>> np.linalg.norm(dfog - ref) < 1e-12
     True
 
-    Compute the first derivatives of the composite function (x**3)**2 @ x=2
+    Compute the first derivatives of the composite function (x^3^2 @ x=2
     >>> x = 2.
     >>> dg = np.array([x**3, 3*x**2, 6*x, 6, 0, 0, 0])
     >>> df = np.array([dg[0]**2, 2*dg[0], 2, 0, 0, 0, 0])
