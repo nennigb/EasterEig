@@ -758,8 +758,8 @@ class CharPol():
         return sol
 
     def homotopy_solve(self, degree=None, tracktol=1e-5, finaltol=1e-10, singtol=1e-14,
-                       dense=True, bplp_max=2000, oo_tol=1e-5):
-        """Homototy solve of the EP system.
+                       dense=True, bplp_max=2000, oo_tol=1e-5, only_bezout=False):
+        """Solve EP system by homotopy method.
 
         This method defines a simplified interface to `pypolsys` homotopy
         solver. Such solver allow to find *all solutions* of the polynomial
@@ -768,7 +768,8 @@ class CharPol():
         This number may be huge.
         Here, we use a m-homogeneous variable partition to limit the number of
         spurious solution 'at infinty' to track. The number of paths is given
-        by `bplp`.
+        by `bplp` and can be obtained without performing the tracking by setting
+        `only_bezout=True`.
         This method is interesting because all solution are found, whereas
         for Newton-Raphson method.
 
@@ -784,19 +785,22 @@ class CharPol():
             is the singularity test threshold used by SINGSYS_PLP.  If
             INGTOL <= 0.0 on input, then SINGTOL is reset to a default value.
         dense : bool, optional
-            If `True`, evaluate the polynomial using multivariate Horner scheme,
-            optimized for dense polynomial. Else, monomial evaluation are used.
+            If `True`, evaluate the polynomial using the fastermultivariate Horner
+            scheme, optimized for dense polynomial. Else, monomial evaluation
+            are used.
         bplp_max : int, optional
             Provides an upper bounds to run homotopy solving.
             If `bplp > bplp_max`, the computation is aborted.
         oo_tol : float, optional
             Tolerance to drop out solution at infinity. If `oo_tol=0`, all
             solution are returned.
+        only_bezout : bool, optional
+            If `True` just compute the Bezout number (fast) and exit.
 
         Returns
         -------
         bplp : int
-            The number of tracked path.
+            The Bezout number corresponding to the number of tracked paths.
         r : np.array
             The solutions of the system express as absolute value wtr to nu0.
             `r` is `None` if the computation has been aborted. If `oo_tol>0`,
@@ -834,6 +838,8 @@ class CharPol():
         print('> Bezout number :', bplp)
         if bplp > bplp_max:
             print('  `bplp` > `bplp_max` ({}). Abort. Increase `bplp_max` and try again.'.format(bplp_max))
+            return bplp, None
+        elif only_bezout:
             return bplp, None
         else:
             bplp = pypolsys.polsys.solve(tracktol, finaltol, singtol)
