@@ -380,7 +380,7 @@ class CharPol():
         """
         return self.multiply(other)
 
-    def EP_system(self, vals):
+    def EP_system(self, vals, trunc=None):
         """Evaluate the successive derivatives of the partial characteristic
         polynomial with respect to lda.
 
@@ -400,6 +400,12 @@ class CharPol():
             Containts the value of (lda, nu_0, ..., nu_n) where the polynom
             must be evaluated. Althought nu is relative to nu0, absolute value
             have to be used.
+        trunc : int or None
+            The truncation to apply in each parameter wtr the maximum available
+            order of the Taylor expansion. The integer is supposed
+            to be negative as in `an[:trunc, :trunc, ..., :trunc]`.
+            This argument is useful to compare several order of Taylor
+            expansion.
 
         Returns
         -------
@@ -408,6 +414,8 @@ class CharPol():
         """
         # Total number of variables (N-1) nu_i + 1 lda
         N = len(vals)
+        # Create slices accounting for truncation
+        slices = (slice(0, trunc),) * (N - 1)
         # polynomial degree in lda
         deg = len(self.dcoefs)
         # Extract input value
@@ -418,7 +426,7 @@ class CharPol():
         # Compute a_n at nu
         for n, a in enumerate(self.dcoefs):
             # an[n] = pu._valnd(polyval, a, *nu)
-            an[n] = polyvalnd(nu, a)
+            an[n] = polyvalnd(nu, a[slices])
 
         # Compute the derivtaive with respect to lda
 
@@ -498,7 +506,7 @@ class CharPol():
                 self._da_slice[row, col] = tuple(da_slice_list)
                 self._da_shape[row, col] = da_shape.copy()
 
-    def jacobian(self, vals):
+    def jacobian(self, vals, trunc=None):
         """Compute the jacobian matrix of the EP system at nu.
 
         This system is built on the sucessive derivatives of the partial
@@ -508,6 +516,7 @@ class CharPol():
              [dp1/dlda, dp1/dnu_0 ...., dp1/dnu_n],
               .....]
         where pi = d^ip0/dlda^i.
+
 
         Generically, this système yields to a finite set of EP.
 
@@ -521,6 +530,12 @@ class CharPol():
             Containts the value of (lda, nu_0, ..., nu_n) where the polynom
             must be evaluated. Althought nu is relative to nu0, absolute value
             have to be used.
+        trunc : int or None
+            The truncation to apply in each parameter wtr the maximum available
+            order of the Taylor expansion. The integer is supposed
+            to be negative as in `an[:trunc, :trunc, ..., :trunc]`.
+            This argument is useful to compare several order of Taylor
+            expansion.
 
         Returns
         -------
@@ -535,6 +550,8 @@ class CharPol():
         """
         # Total number of variables (N-1) nu_i + 1 lda
         N = len(vals)
+        # Create slices accounting for truncation
+        slices = (slice(0, trunc),) * (N - 1)
         # polynomial degree in lda
         deg = len(self.dcoefs)
         # Extract input value
@@ -565,7 +582,7 @@ class CharPol():
                     # and fill it with the shifted the coef matrix
                     da = a[da_slice[row, col]] * der_coef[row, col]
                     # an[n] = pu._valnd(polyval, da, *nu)
-                    an[n] = polyvalnd(nu, da)
+                    an[n] = polyvalnd(nu, da[slices])
                 # apply derivative with respect to lda
                 if col == 0:
                     # Increase the derivation order
