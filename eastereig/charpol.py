@@ -651,6 +651,24 @@ class CharPol():
         # np.polynomial.polynomial.polyval start by low degree!!!
         return an
 
+    def eval_lda_at(self, nu):
+        """Evaluate the eigenvalues at nu.
+
+        Parameters
+        ----------
+        nu : iterable
+            Containts the values of (nu_0, ..., nu_n) where the polynom
+            must be evaluated. Althought nu is relative to nu0, absolute value
+            have to be used.
+
+        Returns
+        -------
+        lda : array
+            The eigenvalue estimated at nu.
+        """
+        an = self.eval_an_at(nu)
+        return np.roots(an)
+
     @staticmethod
     def _newton(f, J, x0, tol=1e-8, normalized=True, verbose=False):
         """Run basic Newton method for vectorial function.
