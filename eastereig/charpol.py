@@ -196,10 +196,10 @@ class CharPol():
 
     def __repr__(self):
         """Define the representation of the class."""
-        return "Instance of {}  @nu0={} with #{} derivatives and #{} eigs..".format(self.__class__.__name__,
-                                                                                    self.nu0,
-                                                                                    self._an_taylor_order,
-                                                                                    self.N)
+        return "Instance of {}  @nu0={} with #{} derivatives and #{} eigs.".format(self.__class__.__name__,
+                                                                                   self.nu0,
+                                                                                   self._an_taylor_order,
+                                                                                   self.N)
 
     def export(self, filename):
         """Export a charpol object using pickle.
@@ -325,7 +325,7 @@ class CharPol():
         P : CharPol
             The results of the multiplcation of both CharPol.
         """
-        if not isinstance(C, CharPol):
+        if not isinstance(C, self.__class__):
             raise ValueError('`C` must be a CharPol object.')
         # Need to check if both nu0 are the same
         try:
@@ -379,6 +379,19 @@ class CharPol():
         Shorthand or the `multiply` method.
         """
         return self.multiply(other)
+
+    def conj(self):
+        """Return a copy of the complex conjugate CharPol.
+
+        Remarks
+        -------
+        This may be usefull to speed-up CharPol construction when all
+        eigenvalues come in a complex conjugate pairs.
+        """
+        dcoefs = [ai.copy().conj() for ai in self.dcoefs]
+        dLambda = [ai.copy().conj() for ai in self.dLambda]
+        return CharPol._from_dcoefs(dcoefs, dLambda, self.nu0)
+
 
     def EP_system(self, vals, trunc=None):
         """Evaluate the successive derivatives of the partial characteristic
