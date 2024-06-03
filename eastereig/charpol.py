@@ -46,7 +46,7 @@ import pickle
 # import numpy.polynomial.polyutils as pu
 from eastereig.fpoly import polyvalnd
 import pypolsys
-
+from matplotlib import pyplot as plt
 
 class CharPol():
     r"""
@@ -392,10 +392,38 @@ class CharPol():
         dLambda = [ai.copy().conj() for ai in self.dLambda]
         return CharPol._from_dcoefs(dcoefs, dLambda, self.nu0)
 
+    def trunc(self, param_truncation=-1):
+        """Return a copy of a truncated conjugate CharPol.
+
+        Parameters
+        ----------
+        param_truncation: iterable or int
+            This truncation parameter is negative and indicate how many derivative
+            order should be removed.
+            If it is a integer, the same truncation is applied for all
+            parameters, else the truncation may be given for each variable.
+            The default is `-1` and remove the last order. Use `None` in the
+            iterable to pick all available order for a given variable.
+
+        Remarks
+        -------
+        This may be usefull to test sensitivity and convergence.
+        """
+        N = len(self.nu0)
+        # Create slices accounting for truncation
+        if isinstance(param_truncation, int):
+            slices = (slice(0, param_truncation),) * (N - 1)
+        elif hasattr(param_truncation, '__iter__'):
+            slices = tuple([slice(0, i) for i in param_truncation])
+        else:
+            raise ValueError('`param_truncation` should be an integer or an iterable')
+
+        dcoefs = [ai[slices].copy() for ai in self.dcoefs]
+        dLambda = [ai[slices].copy() for ai in self.dLambda]
+        return CharPol._from_dcoefs(dcoefs, dLambda, self.nu0)
 
     def EP_system(self, vals, trunc=None):
-        """Evaluate the successive derivatives of the partial characteristic
-        polynomial with respect to lda.
+        """Evaluate the successive derivatives of the CharPol with respect to lda.
 
         This system is built on the sucessive derivatives of the partial
         characteristic polynomial,
@@ -806,7 +834,7 @@ class CharPol():
         return sol
 
     def homotopy_solve(self, degree=None, tracktol=1e-5, finaltol=1e-10, singtol=1e-14,
-                       dense=True, bplp_max=2000, oo_tol=1e-5, only_bezout=False):
+                       dense=True, bplp_max=2000, oo_tol=1e-5, only_bezout=False, tol_filter=1e-12):
         """Solve EP system by homotopy method.
 
         This method defines a simplified interface to `pypolsys` homotopy
@@ -844,6 +872,10 @@ class CharPol():
             solution are returned.
         only_bezout : bool, optional
             If `True` just compute the Bezout number (fast) and exit.
+        tol_filter: flaot, optional
+            Tolerance to drop small terms in the charpol. To keep all terms,
+            -1 can be used. The amplitude of leading order in lda**N is 1 by
+            convention.
 
         Returns
         -------
@@ -856,7 +888,7 @@ class CharPol():
             If `bplp > bplp_max`, `r` is None.
         """
         # Convert to sympy
-        p0, variables = self.taylor2sympyPol(self.dcoefs)
+        p0, variables = self.taylor2sympyPol(self.dcoefs, tol=tol_filter)
         _lda, *_ = variables
         deg = self._an_taylor_order
 
@@ -899,6 +931,54 @@ class CharPol():
             finite_sol = np.nonzero(np.abs(r[-1, :]) > oo_tol)
             print('> ', time.time() - t0, 's in homotopy solve. Found', bplp, 'solutions.')
             return bplp, r[:-1, finite_sol[0]].T
+
+    def filter_spurious_solution(self, sol, trunc=-1, filter=True, tol=1e-2, plot=False):
+        """Remove spurious solution based on roots sensitivty estimation.
+
+        Parameters
+        ----------
+        sol : array
+            Contains the all the found EP solutions arange in along the row.
+        trunc : int
+            The truncation to apply in each parameter wtr the maximum available
+            order of the Taylor expansion. The integer is supposed
+            to be negative as in `an[:trunc, :trunc, ..., :trunc]`.
+        filter : bool, optional
+            If `True`, only true solution are filter.
+        tol : float
+            The tolerance used in the filtering. sol such kappa(sol) > tol are
+            removed.
+        plot: bool
+            Plot the sensitivity distribution.
+
+        Returns
+        -------
+        delta : array
+            The estimated sensitivity of each `sol`.
+        solf : array
+            The filtered solution if `filter=True`, `None` otherwise.
+        deltaf : array
+            The sensitivity of the filtered solution if `filter=True`, `None` otherwise.
+        """
+        delta = np.zeros((sol.shape[0],))
+        for i, soli in enumerate(sol):
+            J = self.jacobian(soli, trunc=trunc)
+            delta[i] = np.linalg.norm(np.linalg.inv(J) @ self.EP_system(soli, trunc=trunc))
+
+        if filter:
+            solf = sol[delta < tol, :].copy()
+            deltaf = delta[delta < tol].copy()
+        else:
+            solf = None
+            deltaf = None
+
+        if plot:
+            fig_delta, ax_delta = plt.subplots()
+            ax_delta.semilogy(sorted(delta), 'k+', markersize='6')
+            ax_delta.axhline(y=tol, color='grey', linestyle=':')
+            ax_delta.set_ylabel(r'$\delta$')
+            ax_delta.set_xlabel('Solution index')
+        return delta, solf, deltaf
 
     @staticmethod
     def _drop_higher_degree(p, degrees):
@@ -946,6 +1026,7 @@ class CharPol():
             Multivariate polynomial in sympy format on complex field.
         tol : float
             Tolerance below which coefficients are set to 0 in sympy polynomials.
+            To keep all terms, -1 can be used.
 
         Examples
         --------
