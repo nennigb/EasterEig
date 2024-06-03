@@ -1312,6 +1312,54 @@ class CharPol():
 
         return S
 
+    @staticmethod
+    def _radii_fit_1D(a):
+        """Estimate the radii of convergence using least square of 1D sequence.
+
+        Parameters
+        ----------
+        a: array 1D
+            The Taylor series coefficients.
+
+        Return
+        ------
+        alpha: float
+            The radius of convergence.
+        """
+        D = a.size
+        alp = np.arange(0, D)[:, None]
+        V = np.hstack((np.ones((D, 1)), alp))
+        beta, alpha = np.linalg.pinv(V) @ (np.log(np.abs(a).reshape(-1, 1)))
+        return np.exp(-alpha.flat[0])
+
+    def radii_estimate(self):
+        """Estimate the radii of convergence of all CharPol coefficients.
+
+        The approach is based on least square fit for all paremeters and
+        all the CharPol coefficients and assume single variable dependance.
+
+        Returns
+        -------
+        R : dict
+            A dictionnary containing the statistics of the radius of convergence for
+            all coefficients and along all directions.
+            The primary keys are the parameter integer index and the condidary
+            keys are the `mean` and the `std` obtained for all polynomial coefficients.
+        """
+        R = {}
+        dcoef_r = np.zeros((self.dcoefs[0].ndim, len(self.dcoefs)-1))
+        # Loop over chapol coef, skip 1st
+        for n, an in enumerate(self.dcoefs[1:]):
+            # Loop over the parameters
+            for p in range(0, an.ndim):
+                index = [0] * an.ndim
+                index[p] = slice(0, None)
+                dcoef_r[p, n] = self._radii_fit_1D(an[tuple(index)])
+        for p in range(0, an.ndim):
+            R[p] = {'mean': dcoef_r[p, :].mean(),
+                    'std': dcoef_r[p, :].std()}
+        return R
+
 
 class Taylor:
     r"""Define a multivariate Taylor series.
