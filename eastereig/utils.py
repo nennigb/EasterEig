@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Eastereig.  If not, see <https://www.gnu.org/licenses/>.
 
-""" Contains helper functions (combinatoric, derivation, ...)
+"""Contains helper functions (combinatoric, derivation, ...)
 """
 import numpy as np
 from numpy import zeros, asarray, eye, poly1d, hstack, r_
@@ -25,6 +25,10 @@ from scipy.special import factorial, binom
 import itertools as it
 from collections import deque, namedtuple
 from functools import reduce
+from functools import lru_cache
+from eastereig.fpoly import polyvalnd
+# Maxsize of the lru_cache
+MAXSIZE = None
 
 
 def two_composition(order, max_order):
@@ -768,6 +772,294 @@ def complex_map(bounds=(-5-5j, 5+5j), N=30):
     return zr + 1j*zi
 
 
+class Taylor:
+    r"""Define a multivariate Taylor series.
+
+    The series is defined as
+    \(T = \sum_{n_0, n_1, \dots} a_{n_0, n_1, \dots} \nu_0^{n_0}, \nu_1^{n_1} \dots\)
+    where the constant 0-order term is \(a_{0, 0, \dots}\).
+    """
+
+    def __init__(self, an, nu0):
+        """Initialize the object with df/d nu divided by factorial.
+
+        Parameters
+        ----------
+        an : np.ndarray
+            The coefficients of the Taylor expansion.
+        nu0 : iterable
+            The value where the Taylor series is computed.
+        """
+        self.an = an
+        self.nu0 = nu0
+
+    @classmethod
+    def from_derivatives(cls, dn, nu0):
+        """Instanciate Taylor object from the sucessive derivatives df/dnu.
+
+        Parameters
+        ----------
+        dn : array
+            The coefficients of the function derivatives wrt nu.
+        nu0 : iterable
+            The value where the derivatives are computed.
+
+        Returns
+        -------
+        Taylor
+            An new Taylor instance.
+        """
+        an = div_factorial(dn)
+        return cls(an, nu0)
+
+    def __repr__(self):
+        """Define the representation of the class."""
+        return "Instance of {} @nu0={} with #{} derivatives.".format(self.__class__.__name__,
+                                                                     self.nu0,
+                                                                     self.an.shape)
+
+    def eval_at(self, nu):
+        """Evaluate the Taylor series at nu with derivatives computed at nu0.
+
+        Parameters
+        ----------
+        nu : iterable
+            Containts the value of (nu_0, ..., nu_n) where the polynom
+            must be evaluated. Althought nu is relative to nu0, absolute value
+            have to be used.
+
+        Returns
+        -------
+        The evaluation of the Taylor series at nu.
+
+        Examples
+        --------
+        Works also for scalar case,
+        >>> T = Taylor(1/factorial(np.arange(0, 6)), 0.)
+        >>> np.allclose(T.eval_at(0.1), np.exp(0.1), atol=1e-4)
+        True
+        """
+        # Extract input value
+        nu = np.array(nu, dtype=complex) - np.array(self.nu0, dtype=complex)
+        # Evaluate the polynomial
+        return polyvalnd(nu, self.an)
+
+    @staticmethod
+    def _radii_fit_1D(a):
+        """Estimate the radii of convergence using least square of 1D sequence.
+
+        Parameters
+        ----------
+        a: array 1D
+            The Taylor series coefficients.
+
+        Return
+        ------
+        alpha: float
+            The radius of convergence.
+        """
+        D = a.size
+        alp = np.arange(0, D)[:, None]
+        V = np.hstack((np.ones((D, 1)), alp))
+        beta, alpha = np.linalg.pinv(V) @ (np.log(np.abs(a).reshape(-1, 1)))
+        return np.exp(-alpha.flat[0])
+
+    def radii_estimate(self):
+        """Estimate the radii of convergence of the Taylor exapnsion.
+
+        The approach is based on least square fit for all paremeters and
+        all the CharPol coefficients and assume single variable dependance.
+
+        Returns
+        -------
+        R : dict
+            A dictionnary containing the statistics of the radius of convergence for
+            all coefficients and along all directions.
+            The primary keys are the parameter integer index and the condidary
+            keys are the `mean` and the `std` obtained for all polynomial coefficients.
+        """
+        an = self.an
+        R = np.zeros(an.ndim)
+        # Loop over the parameters
+        for p in range(0, an.ndim):
+            index = [0] * an.ndim
+            index[p] = slice(0, None)
+            R[p] = Taylor._radii_fit_1D(an[tuple(index)])
+        return R
+
+
+    # def myroots(coef):
+    #     """Provide a global interface for roots of polynom with variable coefficients.
+
+    #     The polynomial is defined such, coef[0] x**n + ... + coef[-1] and
+
+
+    #     Analytic formula are used for qudratric and cubic polynomial and numerical
+    #     methods are used for higher order.
+
+
+    #     Parameters
+    #     ----------
+    #     coef : list of complex array like
+    #         Contains the value of each coefficients.
+
+    #     Returns
+    #     -------
+    #     r : list
+    #         list of roots for each vector coef
+
+    #     """
+
+    #     # number of coef of the polynome
+    #     n = len(coef)
+    #     if n == 3:
+    #         # quadratique
+    #         r = quadratic_roots(*coef)
+    #     elif n==4:
+    #         # cubic
+    #         r = cubic_roots(*coef)
+    #     elif n==5:
+    #         # quatic, only exceptionhandle is the Biquadratic equation
+    #         r = quartic_roots(*coef)
+
+    #     else:
+    #         # quelquonque
+    #         N = len(coef[0])
+    #         r=np.zeros((n-1, N), dtype=complex)
+
+    #         for i, c in enumerate(zip(*coef)):
+    #             print(c)
+    #             ri = np.roots(c)
+    #             r[:,i] = ri
+
+    #     return r
+
+
+    # def quadratic_roots(a, b, c):
+    #     """Analytic solution of a quadratic polynom P(x)=ax^2+bx+c.
+
+    #     Parameters
+    #     ----------
+    #     a, b, c : complex array like
+    #         coeff of the polynom such
+
+    #     Returns
+    #     --------
+    #     r : list
+    #         list of roots
+    #     """
+    #     tol = 1e-8
+    #     # check on 1st coef
+    #     if np.linalg.norm(a)< tol:
+    #         raise ValueError('The first coefficient cannot be 0.')
+
+    #     Delta = np.sqrt(b**2 - 4*a*c, dtype=np.complex)
+    #     r1 = (- b - Delta)/(2*a)
+    #     r2 = (- b + Delta)/(2*a)
+    #     r = [r1, r2]
+
+    #     return r
+
+    # def cubic_roots(a,b,c,d):
+    #     """Analytic solution of a cubic polynom  P(x)=ax^3+bx^2+cx+d.
+
+    #     Parameters
+    #     ----------
+    #     a, b, c, d : complex array like
+    #         coeff of the polynom such
+
+    #     Returns
+    #     --------
+    #     r : list
+    #         list of roots
+
+    #     Examples
+    #     --------
+    #     Solve `x**3 - 4.0*x**2 + 6.0*x - 4.0` with complex roots,
+    #     >>> coef = [1, -4, 6, -4]
+    #     >>> r = np.array(cubic_roots(*coef)); r.sort()
+    #     >>> r_ = np.array([2, 1+1j, 1-1j]); r_.sort()
+    #     >>> np.linalg.norm(r - r_) < 1e-12
+    #     True
+    #     """
+    #     tol = 1e-8
+    #     # check on 1st coef
+    #     if np.linalg.norm(a)< tol:
+    #         raise ValueError('The first coefficient cannot be 0.')
+
+    #     D0 = b**2 - 3*a*c
+    #     D1 = 2*b**3 - 9*a*b*c + 27*(a**2)*d
+    #     C = ((D1 + np.sqrt(D1**2 - 4*D0**3, dtype=np.complex))/2.)**(1./3.)
+    #     xi = -0.5 + 0.5*np.sqrt(3)*1j
+    #     x = []
+    #     for k in range(1, 4):
+    #         xk = -1/(3*a)*(b + xi**k*C + D0/(xi**k*C))
+    #         x.append(xk)
+    #     return x
+
+    # def quartic_roots(a,b,c,d,e):
+    #     """Analytic solution of a quartic polynom P(x)=ax^4+bx^3+cx^2+dx+e.
+
+    #     Parameters
+    #     ----------
+    #     a, b, c, d, e : complex array like
+    #         coeff of the polynom. Better to unpack list to set them.
+
+    #     Returns
+    #     --------
+    #     r : array
+    #         list of roots
+
+    #     Remarks
+    #     --------
+    #     Only the biquadratic exception is implemented. Through extensive tests, no
+    #     other problems have been found, but...
+    #     https://en.wikipedia.org/wiki/Quartic_function
+
+    #     Examples
+    #     --------
+    #     Solve `x**4 - 7.0*x**3 + 2.0j*x**3 + 18.0*x**2 - 8.0j*x**2 - 22.0*x + 12.0j*x + 12.0 - 8.0j` with complex roots,
+    #     >>> coef = [1, -7.0 + 2.0j, 18.0 - 8.0j, -22.0 + 12.0j, 12.0 - 8.0j]
+    #     >>> r = np.array(quartic_roots(*coef)); r.sort()
+    #     >>> r_ = np.array([1+1j , 2, 1-1j, 3-2j]); r_.sort()
+    #     >>> np.linalg.norm(r - r_) < 1e-12
+    #     True
+
+    #     Biquadratic equation (degenerate case)
+    #     >>> coef = [1, 0, -9 + 2j, 0, -18j]
+    #     >>> r = np.array(quartic_roots(*coef)); r.sort()
+    #     >>> r_ = np.array([3, -3, 1-1j, -1+1j]); r_.sort()
+    #     >>> np.linalg.norm(r - r_) < 1e-12
+    #     True
+    #     """
+    #     tol = 1e-8
+    #     # check on 1st coef
+    #     if np.linalg.norm(a)< tol:
+    #         raise ValueError('The first coefficient cannot be 0.')
+
+    #     Delta0 = c**2 - 3*b*d + 12*a*e
+    #     Delta1 = 2*c**3 - 9*b*c*d + 27*b**2*e + 27*a*d**2 - 72*a*c*e
+    #     p = (8*a*c - 3*b**2)/(8*a**2)
+    #     q = (b**3 - 4*a*b*c + 8*a**2*d) / (8*a**3)
+    #     if np.linalg.norm(q)< tol:
+    #         # degenerate case of Biquadratic equation
+    #         r = quadratic_roots(*[a, c, e])
+    #         r[0] = np.sqrt(r[0])
+    #         r[1] = np.sqrt(r[1])
+    #         r.extend([-r[0], -r[1]])
+    #     else:
+    #         Q = np.power( 0.5*(Delta1 + np.sqrt(Delta1**2 - 4*Delta0**3, dtype=np.complex)), 1/3., dtype=np.complex)
+    #         S = 0.5*np.sqrt(-2*p/3 + 1/(3*a)*(Q + Delta0/Q), dtype=np.complex )
+
+
+    #         B = -b/(4*a)
+    #         Dp = 0.5*np.sqrt(-4*S**2 - 2*p + q/S, dtype=np.complex)
+    #         Dm = 0.5*np.sqrt(-4*S**2 - 2*p - q/S, dtype=np.complex)
+    #         r = [B - S + Dp,
+    #              B - S - Dp,
+    #              B + S + Dm,
+    #              B + S - Dm]
+    #     return r
 # %% Main for basic tests
 if __name__ == '__main__':
     # run doctest Examples
