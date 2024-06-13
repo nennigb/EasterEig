@@ -39,7 +39,8 @@ import time
 import itertools as it
 
 from eastereig import _petscHere, gopts, _CONST
-from eastereig.utils import pade
+from eastereig.utils import pade, Taylor
+from numpy.distutils.misc_util import is_sequence
 
 if _petscHere: 
     from slepc4py import SLEPc
@@ -64,30 +65,33 @@ def Eig(lib, *args, **kwargs):
 # compatible with Python 2 *and* 3:
 # ABC = ABCMeta('ABC', (object,), {'__slots__': ()})
 class AbstractEig(ABC):
-    """ Abstract class that manage an eigenpair (lda,x)  of an OP object and its derivatives
+    """Abstract class that manage an eigenpair (lda, x) of an OP object and its derivatives.
 
     The derivatives are computed thanks to Andrew, Chu, Lancaster method (1994).
 
     Attributes
     -----------
     lib: string  {'numpy','scipysp','petsc'}
-        the name of the matrix library
+        The name of the matrix library
     lda: complex
-        the eigenvalue
+        The eigenvalue
     x: complex array_like of type lib
-        the eigenvector
+        The eigenvector
     dx: list (if computated)
-        the list of the sucessive derivatives of x % nu
+        The list of the sucessive derivatives of x % nu
     dlda: list (if computated)
-        the list of the sucessive derivatives of lda % nu
+        The list of the sucessive derivatives of lda % nu
+    nu0: None, scalar or iterable
+        The value is generally set whe the derivative are computed or loaded.
     """
 
     def __init__(self, lib, lda=None, x=None):
-        """ Init the instance
+        """Init the instance
         """
         self._lib = lib
         self.lda = lda
         self.x = x  # must add normalisation here
+        self.nu0 = None
 
         # init derivative if note None
         if (lda is not None) & (x is not None):
@@ -164,6 +168,11 @@ class AbstractEig(ABC):
         """
         pass
 
+    def to_Taylor(self):
+        """Convert the eigenvalue derivatives to Taylor class."""
+        return Taylor.from_derivatives(np.array(self.dlda, dtype=complex),
+                                       self.nu0)
+
     def taylor(self, points, n=-1):
         """
         Evaluate the Taylor expansion of order n at `points`.
@@ -171,29 +180,41 @@ class AbstractEig(ABC):
         Parameters
         ----------
         points : array_like
-            the value where the series is evaluated. Give the absolute value,
+            The value where the series is evaluated. Give the absolute value,
             not the relative % nu0.
+            In the multivariate case, the function is not vectorized. Just put
+            the computation point.
         n : int
             The number of terms considered in the expansion
-            if no value is given or if n=-1, the size of the array dlda is considered,
+            if no value is given or if n is `None`, the full array `dlda` is considered.
+            if n is negative truncation are used.
 
         Returns
         -------
         tay : array_like
             the eigenvalue Taylor series
         """
-        # check order vs length
-        if n > len(self.dlda):
-            print('Run getDerivative before...\n')
+        # Check order vs length
+        if len(self.dlda) == 0:
+            raise IndexError('Run getDerivative* before...\n')
 
-        if n == -1: n = len(self.dlda)
-        # converting to np.array
-        dlda = np.array(self.dlda, dtype=complex)
-        # get Taylor coef in ascending order
-        Df = dlda[0:n] / sp.special.factorial(np.arange(n))
-        # polyval require higher degree first
-        tay = np.polyval(Df[::-1], points - self.nu0)
-
+        # Check if scalar
+        if not is_sequence(self.nu0):
+            if n is None: n = len(self.dlda)
+            # Converting to np.array
+            dlda = np.array(self.dlda, dtype=complex)
+            # Get Taylor coef in ascending order
+            Df = dlda[0:n] / sp.special.factorial(np.arange(n))
+            # Polyval require higher degree first
+            tay = np.polyval(Df[::-1], points - self.nu0)
+        else:
+            N = self.dlda.ndim
+            # Create slices accounting for truncation
+            slices = (slice(0, n),) * N
+            print(self.dlda[slices].shape)
+            T = Taylor.from_derivatives(np.array(self.dlda[slices], dtype=complex),
+                                        self.nu0)
+            tay = T.eval_at(points)
         return tay
 
     def pade(self, points, n=-1):
@@ -208,17 +229,26 @@ class AbstractEig(ABC):
         n : int
             The number of terms considered in the expansion
             if no value is given or if n=-1, the size of the array dlda is considered
+
         Returns
         -------
         pad : array_like
             the value of padé approximant at point
+
+        Remarks
+        -------
+        For now, works only for scalar parameters nu.
         """
-        # check order vs length
+        # Check order vs length
         if len(self.dlda) == 1:
-            print('Run getDerivative before...\n')
+            raise IndexError('Run getDerivative* before...\n')
 
-        if n == -1: n= len(self.dlda)
+        if is_sequence(self.nu0):
+            raise NotImplementedError(('Padé approximant works now only for scalar parameter.',
+                                      'Not for nu0={}'.format(self.nu0)))
 
+        if n == -1:
+            n = len(self.dlda)
         # converting to np.array
         dlda = np.array(self.dlda, dtype=complex)
         # get Taylor coef in ascending order
@@ -226,7 +256,6 @@ class AbstractEig(ABC):
         # order d(0) -> d(n) for padé
         p, q = pade(Df, n//2)
         pad = p(points-self.nu0) / q(points-self.nu0)
-
         return pad
 
     def puiseux(self, ep, points, index=0, n=-1):
