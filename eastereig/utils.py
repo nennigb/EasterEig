@@ -847,38 +847,89 @@ class Taylor:
         return polyvalnd(nu, self.an)
 
     @staticmethod
-    def _radii_fit_1D(a):
-        """Estimate the radii of convergence using least square of 1D sequence.
+    def _radii_fit_1D(a, plot=False):
+        r"""Estimate the radii of convergence using least square of 1D sequence.
+
+        Based on Cauchy-Hadamard,
+        $$\frac{1}{\rho} = |a_n|^{1/n}$$
+        yields to
+        $$-\mathbf{V} \alpha + beta = \ln{\mathbf{a}}$$
+
+        For instance if some terms are vanishing, like odd or even terms,
+        the LS fit add a bias (The theory introduce the sup lim!). To limit
+        this, approach based on peaks location may works (not implemented).
 
         Parameters
         ----------
         a: array 1D
             The Taylor series coefficients.
+        plt: bool, optional
+            If `True` plots the data and the fit.
 
         Return
         ------
-        alpha: float
+        rho: float
             The radius of convergence.
         """
+        # tol for detecting alternate vanishing coefs
+        tol = 0.25
+        eps = 1e-16
+        # Remove log singularity
+        a = a + eps
         D = a.size
         alp = np.arange(0, D)[:, None]
+        # LS fit
         V = np.hstack((np.ones((D, 1)), alp))
+        # beta correspond to the normalization by a0
         beta, alpha = np.linalg.pinv(V) @ (np.log(np.abs(a).reshape(-1, 1)))
-        return np.exp(-alpha.flat[0])
+        rho = np.exp(-alpha.flat[0])
+        # Estimation based only on last term
+        rho_ = 1/(np.abs((a[-1]/a[0]))**(1/(a.size-1)))
+        if abs(a[0]) < eps:
+            print('Warning: The first term is near zero.')
+        if (rho-rho_)/rho > tol:
+            print('Warning: suspect alternate vanishing coefficients rhof={}, rho1={}.'.format(rho, rho_))
+        if plot:
+            from matplotlib import pyplot as plt
+            plt.figure()
+            plt.plot(alp, np.log(np.abs(a)), '*', label='True')
+            # plt.plot(alp, np.log(np.abs(a_) + eps), '.', label='MV')
+            plt.plot(alp, beta + alp * alpha, label='fit')
+            plt.ylabel(r'$\log{a_i}$')
+            plt.xlabel(r'Power')
+            plt.legend()
+        return rho
 
-    def radii_estimate(self):
-        """Estimate the radii of convergence of the Taylor exapnsion.
+    def radii_estimate(self, plot=False):
+        r"""Estimate the radii of convergence of the Taylor expansion.
 
         The approach is based on least square fit for all paremeters and
-        all the CharPol coefficients and assume single variable dependance.
+        all the series coefficients and assume single variable dependance.
 
         Returns
         -------
-        R : dict
-            A dictionnary containing the statistics of the radius of convergence for
-            all coefficients and along all directions.
-            The primary keys are the parameter integer index and the condidary
-            keys are the `mean` and the `std` obtained for all polynomial coefficients.
+        R : array
+            The radius of convergence for along all directions.
+        plt: bool, optional
+            If `True` plots the data and the fit.
+
+        Examples
+        --------
+        If $$\frac {1}{1-x} = \sum _{n=0}^{\infty }x^{n}$$, with radius of convergence 1.
+        >>> T = Taylor(np.ones((12,)), 0)
+        >>> np.allclose(T.radii_estimate(), 1, atol=1e-4)
+        True
+
+        When test on $$\tan(x)$$ around 0, it fails because of alternate vanishing terms,
+        illustrating the importance of sup lim in the theory,
+        >>> T = Taylor(np.array([0, 1.00000000000000, 0, 0.333333333333333, 0, 0.133333333333333, 0, 0.0539682539682540, 0, 0.0218694885361552,0,  0.00886323552990220]), 0)
+        >>> T.radii_estimate()  # doctest: +ELLIPSIS
+        Warning: ...
+
+        When test on $$\tan(1+x)$$ around 0, it works better
+        >>> T = Taylor(np.array([3.42551882081476, 5.33492947248766, 9.45049997787964, 16.4965914915633, 28.9182083191928, 50.6548588382890]), 0)
+        >>> np.allclose(T.radii_estimate(), np.pi/2 -1, atol=1e-1)
+        True
         """
         an = self.an
         R = np.zeros(an.ndim)
