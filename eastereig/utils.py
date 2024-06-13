@@ -31,6 +31,7 @@ from eastereig.fpoly import polyvalnd
 MAXSIZE = None
 
 
+# lru_cache doesn't work out-of-the-box for generator
 def two_composition(order, max_order):
     r"""Yield all the 2-compostion of `order` with list of two integers.
 
@@ -90,6 +91,7 @@ def two_composition(order, max_order):
         yield (i, j)
 
 
+@lru_cache(maxsize=MAXSIZE)
 def multinomial_index_coefficients(m, n):
     r"""Return a tuple containing pairs ``((k1,k2,..,km) , C_kn)``
     where ``C_kn`` are multinomial coefficients such that
@@ -180,7 +182,7 @@ def multinomial_index_coefficients(m, n):
     mindex, mcoef = sortdict(r)
     return (mindex, mcoef)
 
-
+@lru_cache(maxsize=MAXSIZE)
 def multinomial_multiindex_coefficients(m, N):
     """Compute the multinomial coefficients and indexes for multi-index.
 
@@ -358,6 +360,7 @@ def diffprodMV(dh, N):
     >>> np.linalg.norm(dh_ref - np.array(d)) < 1e-10
     True
 
+    Other examples are present in `test_multiindex.py`.
     """
     # TODO check type of N
     # Get the number of functions hi
@@ -398,7 +401,6 @@ def diffprodMV(dh, N):
 
     # DH contains the successive derivative, no factorial inside !!
     return DH
-
 
 def diffprodTree(dh, N):
     r"""Compute the n-th derivative of a product of function hi knowing the
