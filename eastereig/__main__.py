@@ -27,6 +27,7 @@ python3 -m eastereig
 """
 import doctest
 import sys
+import numpy as np
 from eastereig import _petscHere
 # immport the file containing the doctest
 from eastereig.examples import WGimpedance_numpy
@@ -38,6 +39,12 @@ from eastereig import ep
 from eastereig import lda_func
 from eastereig import eigSolvers
 from eastereig import fpoly
+
+# Numpy 2.0 change default printing options making doctest failing.
+# https://numpy.org/neps/nep-0051-scalar-representation.html
+# Use legacy mode for testing
+if np.lib.NumpyVersion(np.__version__) >= '2.0.0b1':
+    np.set_printoptions(legacy="1.25")
 
 if _petscHere:
     from eastereig.examples import WGimpedance_petsc
