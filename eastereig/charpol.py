@@ -1311,7 +1311,7 @@ class CharPol():
 
         return S
 
-    def radii_estimate(self):
+    def radii_estimate(self, plot=False):
         """Estimate the radii of convergence of all CharPol coefficients.
 
         The approach is based on least square fit for all paremeters and
@@ -1333,7 +1333,7 @@ class CharPol():
             for p in range(0, an.ndim):
                 index = [0] * an.ndim
                 index[p] = slice(0, None)
-                dcoef_r[p, n] = Taylor._radii_fit_1D(an[tuple(index)])
+                dcoef_r[p, n] = Taylor._radii_fit_1D(an[tuple(index)], plot=plot)
         for p in range(0, an.ndim):
             R[p] = {'mean': dcoef_r[p, :].mean(),
                     'std': dcoef_r[p, :].std()}
