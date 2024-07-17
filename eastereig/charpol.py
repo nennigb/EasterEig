@@ -931,13 +931,14 @@ class CharPol():
             print('> ', time.time() - t0, 's in homotopy solve. Found', bplp, 'solutions.')
             return bplp, r[:-1, finite_sol[0]].T
 
-    def filter_spurious_solution(self, sol, trunc=-1, filter=True, tol=1e-2, plot=False):
+    def filter_spurious_solution(self, sol, trunc=-1, filter=True, tol=1e-2,
+                                 plot=False, sort=True):
         """Remove spurious solution based on roots sensitivty estimation.
 
         Parameters
         ----------
         sol : array
-            Contains the all the found EP solutions arange in along the row.
+            Contains all the found EP candidates solutions along its rows.
         trunc : int
             The truncation to apply in each parameter wtr the maximum available
             order of the Taylor expansion. The integer is supposed
@@ -949,6 +950,9 @@ class CharPol():
             removed.
         plot: bool
             Plot the sensitivity distribution.
+        sort: bool, optional
+            If True, sort the filtered solution with ascending sensitivity
+            `deltaf`. the default is `True`.
 
         Returns
         -------
@@ -967,6 +971,10 @@ class CharPol():
         if filter:
             solf = sol[delta < tol, :].copy()
             deltaf = delta[delta < tol].copy()
+            if sort:
+                index = np.argsort(deltaf)
+                deltaf = deltaf[index]
+                solf = solf[index, :]
         else:
             solf = None
             deltaf = None
@@ -1023,9 +1031,8 @@ class CharPol():
         -------
         P : Pol
             Multivariate polynomial in sympy format on complex field.
-        tol : float
-            Tolerance below which coefficients are set to 0 in sympy polynomials.
-            To keep all terms, -1 can be used.
+        variables : iterable
+            The list of the sympy symbolic variables.
 
         Examples
         --------
