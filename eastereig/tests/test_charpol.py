@@ -97,7 +97,7 @@ class Test_charpol_mult(unittest.TestCase):
         self.assertTrue(check_an.all())
 
     def test_factory_from_recursive_mult(self):
-        """ Test that `_from_recursive_mult` yield same CharPol than Vieta.
+        """Test that `_from_recursive_mult` yield same CharPol than Vieta.
         """
         extracted = self.extracted
 
@@ -119,7 +119,23 @@ class Test_charpol_mult(unittest.TestCase):
         self.assertTrue(check_r2.all())
         self.assertTrue(check_r3.all())
 
+    def test_charpol_set_param(self):
+        """Test the `set_param` method.
+        """
+        extracted = self.extracted
+        # Create globals and partial CharPol
+        C = ee.CharPol._from_recursive_mult(extracted[0:4])
+        nu0 = C.nu0
+        C1 = C.set_param(1, nu0[1] + 0.1)
+        C0 = C.set_param(0, nu0[0] - 0.1)
+        ref = C.eval_an_at(np.array(nu0) + np.array([-0.1, 0.1]))
+        self.assertTrue(np.allclose(C0.eval_an_at(nu0[1] + 0.1), ref))
+        self.assertTrue(np.allclose(C1.eval_an_at(nu0[0] - 0.1), ref))
 
+
+# add test for
+# load export
+# that CharPol coef0 return the good lda for all constructor
 if __name__ == '__main__':
     # run unittest test suite
     unittest.main()

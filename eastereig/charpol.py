@@ -421,6 +421,66 @@ class CharPol():
         dLambda = [ai[slices].copy() for ai in self.dLambda]
         return CharPol._from_dcoefs(dcoefs, dLambda, self.nu0)
 
+    @staticmethod
+    def _set_param(index, value, an):
+        """Compute the a new polynomial by setting one of its parameters.
+
+        After moving the axes, the parameters remains in the same order but
+        without the set parameter.
+        The evaluation is based on `numpy.polynomial.polyval` and use ascending
+        power ordering.
+        The remaining indices of an enumerate multiple sets of coefficients
+        corresponding to the unset coefficient.
+
+        Examples
+        --------
+        >>> rng = np.random.default_rng(seed=1)
+        >>> a = rng.random((4, 3, 2))
+        >>> b1 = CharPol._set_param(1, 0.1, a)
+        >>> b_direct = np.polynomial.polynomial.polyval3d(0.2, 0.1, 0.15, a)
+        >>> np.allclose(b_direct, np.polynomial.polynomial.polyval2d(0.2, 0.15, b1))
+        True
+        >>> b2 = CharPol._set_param(2, 0.15, a)
+        >>> np.allclose(b_direct, np.polynomial.polynomial.polyval2d(0.2, 0.1, b2))
+        True
+        >>> b0 = CharPol._set_param(0, 0.2, a)
+        >>> np.allclose(b_direct, np.polynomial.polynomial.polyval2d(0.1, 0.15, b0))
+        True
+        """
+        cn = np.moveaxis(an, index, 0)
+        b = np.polynomial.polynomial.polyval(value, cn)
+        return b
+
+    def set_param(self, index, value):
+        """Return a new charpol with one of these parameters set to `value`.
+
+        The parameters remains in the same order but without the set parameter.
+
+        Parameters
+        ----------
+        C: Charpol Object
+            The Charpol to process.
+        index: int
+            The index of the parameter to set.
+        value: complex
+            The value to set.
+
+        Returns
+        -------
+        : Charpol
+            The new charpol with a parameter of.
+        """
+        dcoefs_ = []
+        dLambda_ = []
+        value -= self.nu0[index]
+        for an in self.dcoefs:
+            dcoefs_.append(self._set_param(index, value, an))
+        for ldan in self.dLambda:
+            dLambda_.append(self._set_param(index, value, an))
+
+        nu0_ = np.asarray(self.nu0)[np.arange(self.nu0.size) != index]
+        return CharPol._from_dcoefs(dcoefs_, dLambda_, nu0_)
+
     def EP_system(self, vals, trunc=None):
         """Evaluate the successive derivatives of the CharPol with respect to lda.
 
