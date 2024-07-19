@@ -34,6 +34,7 @@ from eastereig.utils import (_outer, diffprodTree, div_factorial, diffprodMV,
                              two_composition, Taylor)
 import sympy as sym
 import scipy.linalg as spl
+import scipy.optimize as spo
 import time
 # // evaluation in newton method
 import concurrent.futures
@@ -828,12 +829,105 @@ class CharPol():
             print('The maximal number of iteration has been reached.')
             return None
 
+    def lm_from_sol(self, z0, tol=1e-8, normalized=True, verbose=False):
+        """Find EP with Levenberg-Marquard solver from single starting point.
+
+        Based on scipy/MINPACK implementation of 'lm' through the scipy.optimize
+        root function.
+        Since the algorithm work with real value problem. Real and imaginary are
+        splt.
+
+        Parameters
+        ----------
+        x0 : array
+            The initial guess of size N.
+        tol : float
+            The tolerance to stop iteration.
+        normalized : bool
+            If `True` the tol is applied to the ratio of the ||f(x)||/||f(x0)||
+        verbose : bool
+            print iteration log.
+
+        Returns
+        -------
+        x : array
+            The solution or None of NiterMax has been reached or if the
+            computation fail.
+        """
+        # set max iteration number
+        niter_max = 500
+        # Def few local function
+        def to_z(x):
+            """Convert the in-lined real and imag unknown `x` to complex unknown."""
+            return x.reshape((-1, 2)) @ np.array([1, 1j])
+
+        def to_x(z):
+            """Convert the complex unknown `z` toin-line real and imag unknown."""
+            return np.stack((z.real, z.imag), axis=1).ravel()
+
+        def f_and_jac(x):
+            """Split the EP system and the jacobian matrix into real and imag."""
+            # Compute the Jac and the function from charpol (C)
+            nparam = len(z0)
+            z = to_z(x)
+            Jc = self.jacobian(z)
+            Fc = self.EP_system(z)
+            # Compute the real version
+            Jr = np.zeros((x.size, x.size))
+            Fr = np.zeros((x.size,))
+            # Add terms from p dans d_lda p
+            for eq_id in range(nparam):
+                eq_idr = eq_id * 2
+                Fr[eq_idr] = Fc[eq_id].real
+                Fr[eq_idr + 1] = Fc[eq_id].imag
+                for i in range(nparam):
+                    ir = i * 2
+                    # Real part eqs
+                    Jr[eq_idr, ir] = Jc[eq_id, i].real
+                    Jr[eq_idr, ir+1] = - Jc[eq_id, i].imag
+                    # Imag part eqs
+                    Jr[eq_idr+1, ir] = Jc[eq_id, i].imag
+                    Jr[eq_idr+1, ir+1] = Jc[eq_id, i].real
+            return Fr, Jr
+
+        # see also hybr,s ometimes beter ?
+        # scaling = np.ones_like(x)
+        # scaling[6:] = imag_scaling
+        # Check input
+        if isinstance(z0, np.ndarray):
+            z0 = z0.ravel()
+        else:
+            z0 = np.array(z0).ravel()
+        x = to_x(z0)
+        scaling = 1. #/ np.abs(x)
+        sol = spo.root(f_and_jac, x, method='lm', jac=True, callback=None,
+                       options={'maxiter': niter_max, 'ftol': tol, 'xtol': tol}) #'diag': scaling
+                            # })  #{}'xtol': 0.00000001,
+        if verbose:
+            print(sol)
+
+        z = to_z(sol.x)
+        x = sol.x
+        if sol.success:
+            if verbose:
+                print('Convergence in {} iterations.'.format(sol.nfev), sol.message)
+        else:
+            print(sol.message)
+            z = None
+        return z
+
     def newton_from_sol(self, x, **kargs):
-        """Run newton from a single starting point."""
+        """Find EP with Newton-Raphson solver from single starting point."""
         return self._newton(self.EP_system, self.jacobian, x, **kargs)
 
-    def newton(self, bounds, Npts=5, decimals=6, max_workers=4, tol=1e-4, verbose=False):
-        """Mesh parametric space and run newton search on each point in parallel.
+    def newton(self, *args, **kargs):
+        """Mesh parametric space and run iterative solver to find EP in parallel."""
+        print('Method `Newton` is now deprecated, use now `iterative_solve`.')
+        return self.iterative_solve(*args, **kargs)
+
+    def iterative_solve(self, bounds, Npts=5, decimals=6, max_workers=4, tol=1e-4, verbose=False,
+                        algorithm='nr'):
+        """Mesh parametric space and run iterative solver to find EP in parallel.
 
         Parameters
         ----------
@@ -852,6 +946,9 @@ class CharPol():
             If `True` the tol is applied to the ratio of the ||f(x)||/||f(x0)||
         verbose : bool
             print iteration log.
+        algorithm : string
+            Can be either 'nr' for Newton-Raphson, either 'lm' for Levenberg-Marquard.
+            The second is often more robust.
 
         Returns
         -------
@@ -875,9 +972,16 @@ class CharPol():
 
         # For each, run Newton search
         all_sol = []
-        # use partial to fixed all function parameters except lda
-        _p_newton = partial(self._newton, self.EP_system, self.jacobian, tol=tol,
-                            verbose=verbose)
+
+        if algorithm == 'nr':
+            # use partial to fixed all function parameters except lda
+            _p_newton = partial(self._newton, self.EP_system, self.jacobian, tol=tol,
+                                verbose=verbose)
+        elif algorithm == 'lm':
+            _p_newton = partial(self.lm_from_sol, tol=tol, verbose=verbose)
+        else:
+            raise NotImplementedError('The request algorithm `{}` is not recognized.'.format(algorithm))
+
         with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
             for s in executor.map(_p_newton,
                                   it.product(*grid),
