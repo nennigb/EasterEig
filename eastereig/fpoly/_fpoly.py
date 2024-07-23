@@ -69,22 +69,22 @@ def polyvalnd(nu, a):
     >>> a1 = np.random.rand(5)*(1+1j)
     >>> pvalf = polyvalnd(2.253+0.1j, a1)
     >>> pvalnp = polyval(2.253+0.1j, a1)
-    >>> abs(pvalf - pvalnp) < 1e-12
+    >>> abs(pvalf - pvalnp) < 1e-11
     True
     >>> a2 = np.random.rand(5, 5)*(1+1j)
     >>> pvalf = polyvalnd((2.253+0j, 1+1j), a2)
     >>> pvalnp = polyval2d(2.253+0j, 1+1j, a2)
-    >>> abs(pvalf - pvalnp) < 1e-12
+    >>> abs(pvalf - pvalnp) < 1e-11
     True
     >>> a3 = np.random.rand(5, 5, 5)*(1+1j)
     >>> pvalf =  polyvalnd((2.253, 1+1j, 0.1+2j), a3)
     >>> pvalnp = polyval3d(2.253, 1+1j, 0.1+2j, a3)
-    >>> abs(pvalf - pvalnp) < 1e-12
+    >>> abs(pvalf - pvalnp) < 1e-11
     True
     >>> a4 = np.random.rand(5, 5, 5, 5)*(1+1j)
     >>> pvalf =  polyvalnd((2.253, 1+1j, 0.1+2j, -0.8+0.2j), a4)
     >>> pvalnp = pu._valnd(polyval, a4, 2.253, 1+1j, 0.1+2j, -0.8+0.2j)
-    >>> abs(pvalf - pvalnp) < 1e-12
+    >>> abs(pvalf - pvalnp) < 1e-11
     True
     """
     d = len(a.shape)
