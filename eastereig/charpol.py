@@ -459,8 +459,6 @@ class CharPol():
 
         Parameters
         ----------
-        C: Charpol Object
-            The Charpol to process.
         index: int
             The index of the parameter to set.
         value: complex
@@ -855,7 +853,7 @@ class CharPol():
             computation fail.
         """
         # set max iteration number
-        niter_max = 500
+        niter_max = 150
         # Def few local function
         def to_z(x):
             """Convert the in-lined real and imag unknown `x` to complex unknown."""
@@ -925,8 +923,8 @@ class CharPol():
         print('Method `Newton` is now deprecated, use now `iterative_solve`.')
         return self.iterative_solve(*args, **kargs)
 
-    def iterative_solve(self, bounds, Npts=5, decimals=6, max_workers=4, tol=1e-4, verbose=False,
-                        algorithm='nr'):
+    def iterative_solve(self, bounds, Npts=4, decimals=4, max_workers=4, tol=1e-4,
+                        verbose=False, algorithm='nr'):
         """Mesh parametric space and run iterative solver to find EP in parallel.
 
         Parameters
@@ -939,9 +937,12 @@ class CharPol():
         Npts : int
             The number of point in each direction between the bounds.
         decimals : int
-            The number of decimals keep to filter the solution (unique)
+            The number of decimals keep to filter the solution (using np.unique).
+            Note it should be concistant with `tol` (~|log10(tol)|).
         max_workers : int
             The number of worker to explore the parametric space.
+        tol : float
+            The tolerance to stop iteration. See solver details for deeper insight.
         normalized : bool
             If `True` the tol is applied to the ratio of the ||f(x)||/||f(x0)||
         verbose : bool
@@ -963,12 +964,25 @@ class CharPol():
         os.environ["OMP_NUM_THREADS"] = "1"
         ```
         """
+        def param_mesh(bound, Npts):
+            Re, Im = np.meshgrid(np.linspace(bound[0].real, bound[1].real, Npts),
+                                 np.linspace(bound[0].imag, bound[1].imag, Npts))
+            z = Re + 1j * Im
+            return z.ravel()
+
         # TODO May limit bounds by convergence radius ?
         tic = time.time()
         # Create a coarse mesh of the parametric space for Newton solving
         grid = []
-        for bound in bounds:
-            grid.append(np.linspace(bound[0], bound[1], Npts))
+        # Strategy linsapce
+        for i, bound in enumerate(bounds):
+            if bound is None:
+                if i == 0:
+                    grid.append(self.lda())
+                else:
+                    raise ValueError('Only the eigenvalue bound can be `None`.')
+            else:
+                grid.append(param_mesh(bound, Npts))
 
         # For each, run Newton search
         all_sol = []
@@ -993,7 +1007,7 @@ class CharPol():
         sol_ = np.array([s for s in all_sol if s is not None])
         # Use unique to remove duplicated row
         sol = np.unique(sol_.round(decimals=decimals), axis=0)
-        print('> ', time.time() - tic, ' s in Newton solve.')
+        print('> ', time.time() - tic, ' s in iterative `{}` solver.'.format(algorithm))
         return sol
 
     def homotopy_solve(self, degree=None, tracktol=1e-5, finaltol=1e-10, singtol=1e-14,
