@@ -53,7 +53,8 @@ setup(
     install_requires=['numpy',
                       'scipy',
                       'sympy>=1.4',
-                      'matplotlib'],
+                      'matplotlib',
+                      'tqdm'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
