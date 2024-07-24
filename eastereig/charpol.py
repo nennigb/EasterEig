@@ -32,10 +32,12 @@ from collections import deque
 from eastereig.eig import AbstractEig
 from eastereig.utils import (_outer, diffprodTree, div_factorial, diffprodMV,
                              two_composition, Taylor)
+from eastereig.loci import Loci
 import sympy as sym
 import scipy.linalg as spl
 import scipy.optimize as spo
 import time
+import tqdm
 # // evaluation in newton method
 import concurrent.futures
 from functools import partial
@@ -1523,3 +1525,46 @@ class CharPol():
             R[p] = {'mean': dcoef_r[p, :].mean(),
                     'std': dcoef_r[p, :].std()}
         return R
+
+    def explore(self, index, bounds, nu=None, nvals=51):
+        """Explore the eigenvalues using brute force evaluation for one parameter.
+
+        The CharPol is converted to a single parameter CharPol and its eigenvalues
+        are evaluated inside the _absolute_ bounds.
+
+        Parameters
+        ----------
+        index: int
+            The index of the parameter to set.
+        bounds: tuple
+            The lower left and upper-right corner of the parameter
+        nu: np.array, optional
+            The value of the parameter vector. If `None` nu0 is used. The size
+            of `nu` should be the same as the size of `nu0`, although The `nu[index]`
+            is not used.
+        nvals: int, optional
+            The number of points in each complex plane direction.
+
+        Returns
+        -------
+        loci: ee.Loci
+            An instance of `Loci` containing all computation results.
+        """
+        if nu is None:
+            nu = self.nu0
+        # Create complex plane, bounds are absolute
+        Re, Im = np.meshgrid(np.linspace(bounds[0].real, bounds[1].real, nvals),
+                             np.linspace(bounds[0].imag, bounds[1].imag, nvals))
+        Nu = Re + 1j * Im
+        LAMBDA_pcp = np.zeros(Nu.shape, dtype=object)
+        for item, nui in tqdm.tqdm(np.ndenumerate(Nu), total=np.prod(Nu.shape)):
+            nu_ = nu.copy()
+            nu_[index] = nui
+            # Run the eigenvalue computation
+            Lambda_ = self.eval_lda_at(nu_)
+            # create a list of the eigenvalue to monitor
+            LAMBDA_pcp[item] = Lambda_.copy()
+        # Create Loci instance
+        LAMBDA_pcp = np.array(LAMBDA_pcp.tolist())
+        loci_pcp = Loci(LAMBDA_pcp, Nu)
+        return loci_pcp
