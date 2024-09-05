@@ -77,9 +77,9 @@ class AbstractEig(ABC):
         The eigenvalue
     x: complex array_like of type lib
         The eigenvector
-    dx: list (if computated)
+    dx: list (if computed)
         The list of the sucessive derivatives of x % nu
-    dlda: list (if computated)
+    dlda: list (if computed)
         The list of the sucessive derivatives of lda % nu
     nu0: None, scalar or iterable
         The value is generally set whe the derivative are computed or loaded.
@@ -150,7 +150,7 @@ class AbstractEig(ABC):
         """  add new derivatives
         """
         self.dlda.extend(dlda)
-        if dx:
+        if dx is not None:
             self.dx.extend(dx)
 
     @abstractmethod
@@ -618,7 +618,7 @@ class PetscEig(AbstractEig):
         # Create an empty array of object
         self.dx = np.empty(N, dtype=object)
         # Create an zeros array for dlda
-        self.dlda = np.zeros(N, dtype=np.complex)
+        self.dlda = np.zeros(N, dtype=complex)
         self.dlda.flat[0] = self.lda
 
         # construction de la matrice de l'opérateur L
@@ -873,7 +873,7 @@ class NumpyEig(AbstractEig):
         self.dx = np.empty(N, dtype=object)
         self.dx.flat[0] = self.x
         # Create an zeros array for dlda
-        self.dlda = np.zeros(N, dtype=np.complex)
+        self.dlda = np.zeros(N, dtype=complex)
         self.dlda.flat[0] = self.lda
 
         # constrution du vecteur (\partial_\lambda L)x, ie L.L1x
@@ -882,8 +882,8 @@ class NumpyEig(AbstractEig):
         # bordered
         # ---------------------------------------------------------------------
         # Same matrix to factorize for all RHS
-        Zer = np.zeros(shape=(1, 1), dtype=np.complex)
-        Zerv = np.zeros(shape=(1,), dtype=np.complex)
+        Zer = np.zeros(shape=(1, 1), dtype=complex)
+        Zerv = np.zeros(shape=(1,), dtype=complex)
         Bord = sp.bmat([[L               , L1x.reshape(-1, 1)],
                         [v.reshape(1, -1), Zer]])  # reshape is to avoid (n,) in bmat
 
@@ -1037,5 +1037,75 @@ class ScipyspEig(AbstractEig):
             print(n, ' ')
 
         print('\n')
+
+    def getDerivativesMV(self, N, op):
+        """ Compute the successive derivative of an eigenvalue of an OP instance
+
+        Parameters
+        -----------
+        N: tuple of int
+            the number derivative to compute
+        op: OPmv
+            the operator OP instance that describe the eigenvalue problem
+
+        RHS derivative must start at n=1 for 1st derivatives
+        """
+
+        # get nu0 value where the derivative are computed
+        self.nu0 = op.nu0
+        # construction de la matrice de l'opérateur L, ie L.L
+        L = op.createL(self.lda)
+        # normalization condition (push elsewhere : différente méthode, indépendace vs type )
+        # must be done before L1x
+        v = np.ones(shape=self.x.shape)
+        # see also VecScale
+        self.x *= (1/v.dot(self.x))
+        # Create an empty array of object
+        self.dx = np.empty(N, dtype=object)
+        self.dx.flat[0] = self.x
+        # Create an zeros array for dlda
+        self.dlda = np.zeros(N, dtype=complex)
+        self.dlda.flat[0] = self.lda
+
+        # constrution du vecteur (\partial_\lambda L)x, ie L.L1x
+        L1x = op.createDL_ldax(self)  # FIXME change, now with return
+        Zerv = np.zeros(shape=(1,), dtype=complex)
+        # bordered
+        # ---------------------------------------------------------------------
+        # Same matrix to factorize for all RHS, conversion to scr for scipy speed
+        Bord = sp.sparse.bmat([[L, L1x.reshape(-1, 1)],
+                               [v.reshape(1, -1), None]]).tocsc()  # reshape is to avoid (n,) in bmat
+
+        # if N > 1 loop for higher order terms
+        print('> Linear solve...')
+        # n start now at 1 for uniformization
+        for n in it.product(*map(range, N)):
+            # Except for (0, ..., 0)
+            if n != (0,)*len(N):
+                # compute RHS
+                tic = time.time()  # init timer
+                Ftemp = op.getRHS(self, n)
+                # F= sp.bmat([Ftemp, Zerv]).reshape(-1,1)
+                F = np.concatenate((Ftemp, Zerv))
+                print("              # getRHS real time :", time.time()-tic)
+    
+                tic = time.time()  # init timer
+                if sum(n) == 1:
+                    # umfpack is not in scipy but need to be installed with scikit-umfpack
+                    # if not present, scipy use superlu
+                    sp.sparse.linalg.use_solver(useUmfpackbool=True)
+                    # compute the lu factor
+                    lusolve = sp.sparse.linalg.factorized(Bord)
+    
+                # Forward and back substitution, u contains [dx, dlda])
+                u = lusolve(F)
+                print("              # solve LU real time :", time.time()-tic)
+    
+                # get lda^(n)
+                derivee = u[-1]
+                # store the value
+                self.dlda[n] = derivee
+                self.dx[n] = u.copy()[:-1]
+                print(n, ' ')
 
 # end class ScipyspEig
