@@ -238,7 +238,8 @@ class Loci:
 
     def plotDiscriminant(self, index=None, variable='\\nu', scale='log',
                          normalize=True, fig=None,
-                         nooutput=False, clip=(0.01, 0.99)):
+                         nooutput=False, clip=(0.01, 0.99),
+                         cmap=plt.cm.turbo):
         r""" Plot of the modulus of the discriminant of the 'partial'
         characteristic polynomial.
 
@@ -266,6 +267,9 @@ class Loci:
             `clip` represents the min and max quantiles to set the color
             limits of the current image. Using `clip` avoid that isolate
             extreme values disturbed the image.
+        cmap : cmap
+            Change the default colormap. The default is the high
+            contrast `turbo` corlormap.
 
         Returns
         -------
@@ -307,10 +311,10 @@ class Loci:
         Fig = plt.figure(num=fig)
         ax = Fig.add_subplot(111)
         if scale == 'lin':
-            im = plt.pcolormesh(nur, nui, np.abs(P), zorder=-1)
+            im = plt.pcolormesh(nur, nui, np.abs(P), zorder=-1, cmap=cmap)
         elif scale == 'log':
             field = np.log10(np.abs(P))
-            im = plt.pcolormesh(nur, nui, field, zorder=-1)
+            im = plt.pcolormesh(nur, nui, field, zorder=-1, cmap=cmap)
             stats = (field.min(), field.max(), field.mean())
             print('> stats:', stats)
         # im = plt.pcolormesh(nur, nui, P.imag, zorder=-1)
@@ -328,7 +332,7 @@ class Loci:
 
 # %% Using pyvista
     def plotRiemannPyvista(self, Type='Re', N=2, Title='empty',
-                           variable='\\nu', lda_list=None, qt=True):
+                           variable='\\nu', lda_list=None, qt=True, normalize=1.):
         """ Plot Riemman surfaces of the selected eigenvalues using pyvista.
 
         The real or imaginary part of the values to be plotted are sorted and
@@ -360,6 +364,9 @@ class Loci:
         qt : bool
             Flag to swtich between `pyvista` and `pyvistaqt`. It allows to plot
             in background using another thread.
+        normalize: float, optional
+            Normalize the eigenvalue using the `normalize` scaling constant. The
+            default is 1.
 
         Returns
         -------
@@ -368,7 +375,7 @@ class Loci:
         picked: list
             The list of the coordinates of the picked points.
         """
-        try:           
+        try:
             import pyvista as pv
             # pyvistaqt allows to plot in background
             if qt:
@@ -433,10 +440,10 @@ class Loci:
         col_name = {'Re': 'Im λ', 'Im': 'Re λ'}
         for mode in range(min(len(lda), N)):
             if Type == 'Re':
-                points = np.column_stack([u, v,  ldaplot[:, :, mode].ravel().real])
+                points = np.column_stack([u, v,  normalize * ldaplot[:, :, mode].ravel().real])
                 col = ldaplot[:, :, mode].ravel().imag
             elif Type == 'Im':
-                points = np.column_stack([u, v,  ldaplot[:, :, mode].ravel().imag])
+                points = np.column_stack([u, v,  normalize * ldaplot[:, :, mode].ravel().imag])
                 col = ldaplot[:, :, mode].ravel().real
             cloud = pv.PolyData(points)
             cloud[col_name[Type]] = col
