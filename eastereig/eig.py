@@ -486,8 +486,8 @@ class PetscEig(AbstractEig):
 
         return ksp
 
-    def getDerivatives(self, N, op):
-        """ Compute the successive derivative of an eigenvalue of an OP instance
+    def getDerivatives(self, N, op, timeit=False):
+        """Compute the successive derivative of an eigenvalue of an OP instance.
 
         Parameters
         -----------
@@ -495,10 +495,12 @@ class PetscEig(AbstractEig):
             the number derivative to compute
         L: OP
             the operator OP instance that describe the eigenvalue problem
+        timeit : bool, optional
+            A flag to activate textual profiling outputs. Default is `False`.
+
 
         RHS derivative must start at n=1 for 1st derivatives
         """
-        affich = False
         # create communicator for mpi command
         comm = PETSc.COMM_WORLD.tompi4py()
 
@@ -563,7 +565,7 @@ class PetscEig(AbstractEig):
             # compute RHS
             tic = time.time()  # init timer
             Ftemp = op.getRHS(self, n)
-            if affich:
+            if timeit:
                 Print("              # getRHS real time :", time.time()-tic)
 
             Fnest = PETSc.Vec().createNest([Ftemp, Zero])
@@ -577,7 +579,7 @@ class PetscEig(AbstractEig):
             tic = time.time()  # init timer
             # F.view(PETSc.Viewer.STDOUT())
             ksp.solve(F, u)
-            if affich:
+            if timeit:
                 Print("              # solve LU real time :", time.time()-tic)
             # store results as list
             # Print('indice :', ind[0][1].getIndices(),u[ind[0][1].getIndices()] )
@@ -592,24 +594,25 @@ class PetscEig(AbstractEig):
             # get lda^(n)
             self.dlda.append(derivee[0])
             self.dx.append(PETSc.Vec().createWithArray(u.getSubVector(ind[0][0]).copy()))  # get pointer from IS, need copy
-            if affich:
+            if timeit:
                 Print(n)
-        if affich:
+        if timeit:
             Print('\n')
 
-    def getDerivativesMV(self, N, op):
-        """ Compute the successive derivative of an eigenvalue of an OP instance
+    def getDerivativesMV(self, N, op, timeit=False):
+        """Compute the successive derivative of an eigenvalue of an OP instance.
 
         Parameters
         -----------
         N: int
-            the number derivative to compute
+            The number derivative to compute
         L: OPmv
-            the operator OP instance that describe the eigenvalue problem
+            The operator OP instance that describe the eigenvalue problem
+        timeit : bool
+            A flag to activate textual profiling outputs. Default is `False`.
 
         RHS derivative must start at n=1 for 1st derivatives
         """
-        affich = False
         # create communicator for mpi command
         comm = PETSc.COMM_WORLD.tompi4py()
 
@@ -682,7 +685,7 @@ class PetscEig(AbstractEig):
                 # compute RHS
                 tic = time.time()  # init timer
                 Ftemp = op.getRHS(self, n)
-                if affich:
+                if timeit:
                     Print("              # getRHS real time :", time.time()-tic)
     
                 Fnest = PETSc.Vec().createNest([Ftemp, Zero])
@@ -696,7 +699,7 @@ class PetscEig(AbstractEig):
                 tic = time.time()  # init timer
                 # F.view(PETSc.Viewer.STDOUT())
                 ksp.solve(F, u)
-                if affich:
+                if timeit:
                     Print("              # solve LU real time :", time.time()-tic)
                 # store results as list
                 # Print('indice :', ind[0][1].getIndices(),u[ind[0][1].getIndices()] )
@@ -711,9 +714,9 @@ class PetscEig(AbstractEig):
                 # get lda^(n)
                 self.dlda[n] = derivee[0]
                 self.dx[n] = PETSc.Vec().createWithArray(u.getSubVector(ind[0][0]).copy())  # get pointer from IS, need copy
-                if affich:
+                if timeit:
                     Print(n)
-            if affich:
+            if timeit:
                 Print('\n')
 
 # end class PetscEig
