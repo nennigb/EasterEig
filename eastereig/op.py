@@ -335,7 +335,7 @@ class OPmv(OP):
         # Init matrix derivative index at previous step, to force 1st computation
         m0old = -1
         # loop over operator matrices
-        for (Kid, K) in enumerate(self.K):
+        for (Kid, _) in enumerate(self.K):
             # TODO caching the matrix
             # How many terms for liebnitz 2 or 3
             if self.flda[Kid] is None:
@@ -350,9 +350,8 @@ class OPmv(OP):
             for (mi, m) in enumerate(mind):
                 # check if index belong to RHS
                 if (tuple(m) not in skip_set):
-                    """ computing the operator derivative may be long, the matrix is cached
-                    until its derivation order change
-                    """
+                    # Computing the operator derivative may be long, the matrix is cached
+                    # until its derivation order change
                     if m[0] != m0old:
                         # if matrix order derivative has changed since last computation, compute it
                         dK_m0_ = self.dK[Kid](*m[0])
@@ -369,5 +368,5 @@ class OPmv(OP):
                             if abs(dlda_m) != 0:
                                 F.obj -= dK_m0.dot(dx_m1.dot(dlda_m*mcoef[mi]))
                 m0old = m[0]
-
+        del m0old, dK_m0_, dK_m0, dx_m1
         return F.obj
