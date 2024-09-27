@@ -685,6 +685,7 @@ class PetscEig(AbstractEig):
                 # compute RHS
                 tic = time.time()  # init timer
                 Ftemp = op.getRHS(self, n)
+                PETSc.garbage_cleanup(comm)
                 if timeit:
                     Print("              # getRHS real time :", time.time()-tic)
     
