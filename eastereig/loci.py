@@ -93,7 +93,7 @@ class Loci:
         """
         np.savez(LAMBDAfile, LAMBDA=self.LAMBDA, NU=self.NU)
 
-    # %% Using matplotlib
+    # %% Using matlab
     def plotRiemannMatlab(self, part, eng, n=3, label=[r'$\nu$', r'$\lambda']):
         """ Plot Riemman surfaces with matlab [optional].
 
@@ -237,10 +237,9 @@ class Loci:
         return Fig, ax
 
     def plotDiscriminant(self, index=None, variable='\\nu', scale='log',
-                         normalize=True, fig=None,
-                         nooutput=False, clip=(0.01, 0.99),
-                         cmap=plt.cm.turbo):
-        r""" Plot of the modulus of the discriminant of the 'partial'
+                         normalize=True, fig=None, clip=(0.01, 0.99),
+                         cmap=plt.cm.turbo, gradient=False):
+        r"""Plot of the modulus of the discriminant of the 'partial'
         characteristic polynomial.
 
         This analytic function vanishes for all multiple roots and is
@@ -270,15 +269,17 @@ class Loci:
         cmap : cmap
             Change the default colormap. The default is the high
             contrast `turbo` corlormap.
+        gradient : bool, optional
+            Plot also the magnitude of the gradient on another figure.
 
         Returns
         -------
         fig : fig
-            the pyplot fig
+            The pyplot fig
         ax : axes
-            the pyplot axes for futher plot
-        im : ScalarMappable
-            The image object (i.e., Image, ContourSet, etc.)
+            The pyplot axes for futher plot
+        ax_g : axes, optional
+            The pyplot axes of the gradient if `gradient=True`, else `None`.
         """
 
         lda = np.asarray(self.LAMBDA)
@@ -321,12 +322,18 @@ class Loci:
         plt.xlabel(r'$\mathrm{Re}\,' + variable + r' $')
         plt.ylabel(r'$\mathrm{Im}\,' + variable + r' $')
         plt.colorbar()
-        if not(nooutput):
-            plt.show()
-
         im.set_clim(np.quantile(field.ravel(), clip[0]),
                     np.quantile(field.ravel(), clip[1]))
-        return Fig, ax, im
+        if gradient:
+            df = np.gradient(field)
+            m = np.sqrt(df[0]**2 + df[1]**2)
+            fig_g, ax_g = plt.subplots()
+            im_g = ax_g.pcolormesh(nur, nui, m, zorder=-1, cmap=cmap)
+            ax_g.set_xlabel(r'$\mathrm{Re}\,' + variable + r' $')
+            ax_g.set_ylabel(r'$\mathrm{Im}\,' + variable + r' $')
+        else:
+            ax_g = None
+        return Fig, ax, ax_g
 
 
 
