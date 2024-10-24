@@ -36,6 +36,7 @@ from eastereig.loci import Loci
 import sympy as sym
 import scipy.linalg as spl
 import scipy.optimize as spo
+from scipy.special import factorial
 import time
 import tqdm
 # // evaluation in newton method
@@ -476,8 +477,14 @@ class CharPol():
         value -= self.nu0[index]
         for an in self.dcoefs:
             dcoefs_.append(self._set_param(index, value, an))
+        # Factorial are not included in dLambda, just apply it in the set direction
+        shape = np.ones(len(self.nu0), dtype=int)
+        shape[index] = self.dLambda[0].shape[index]
+        fact = factorial(np.arange(0, shape[index]))
+        fact = fact.reshape(shape)
         for ldan in self.dLambda:
-            dLambda_.append(self._set_param(index, value, an))
+            ldan_ = ldan / fact
+            dLambda_.append(self._set_param(index, value, ldan_))
 
         nu0_ = np.asarray(self.nu0)[np.arange(self.nu0.size) != index]
         return CharPol._from_dcoefs(dcoefs_, dLambda_, nu0_)
