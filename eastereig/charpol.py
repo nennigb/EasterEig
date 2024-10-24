@@ -183,7 +183,7 @@ class CharPol():
 
 
     @classmethod
-    def _from_recursive_mult(cls, dLambda, nu0=None, block_size=3):
+    def from_recursive_mult(cls, dLambda, nu0=None, block_size=3):
         """Define factory method to create recursively CharPol from the lambdas.
 
         The methods is based on _divide and conquer_ approach. It combines
