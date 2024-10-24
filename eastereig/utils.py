@@ -296,7 +296,7 @@ def diffprod(dh, N):
     # init DH of all h_i (no derivative)
     DH = [np.prod([dh[i][0] for i in range(0, M)])]
     # compute global derivative order n
-    for n in np.arange(1, N):
+    for n in range(1, N):
         # get multinomial index and coefficients
         multi, coef = multinomial_index_coefficients(M, n)
         # liebnitz formula
@@ -307,7 +307,7 @@ def diffprod(dh, N):
             coefk = coef[index]
             # produit
             ph = complex(1.)
-            for t in np.arange(0, M):
+            for t in range(0, M):
                 ph *= dh[t][k[t]]
             sh += ph*coefk
         # store nth derivatibe
@@ -393,7 +393,7 @@ def diffprodMV(dh, N):
             coefk = coef[index]
             # produit
             ph = complex(1.)
-            for t in np.arange(0, M):
+            for t in range(0, M): # TODO try to improve more cython, jit...
                 ph *= dh[t][k[t]]
             sh += ph*coefk
         # store nth derivatibe
