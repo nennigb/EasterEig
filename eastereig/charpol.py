@@ -33,6 +33,7 @@ from eastereig.eig import AbstractEig
 from eastereig.utils import (_outer, diffprodTree, div_factorial, diffprodMV,
                              two_composition, Taylor)
 from eastereig.loci import Loci
+from eastereig.options import gopts
 import sympy as sym
 import scipy.linalg as spl
 import scipy.optimize as spo
@@ -40,7 +41,7 @@ from scipy.special import factorial
 import time
 import tqdm
 # // evaluation in newton method
-import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 import pickle
 # multidimentional polyval
@@ -50,6 +51,38 @@ import pickle
 from eastereig.fpoly import polyvalnd
 import pypolsys
 from matplotlib import pyplot as plt
+
+
+def _dprod(order, S_dcoefs, C_dcoefs, max_order, shape, N):
+    """Inner function used in Multiply."""
+    dcoefs_order = np.zeros(shape, dtype=complex)
+    # Get all combinaisons of with 2 coefficients to have exactly the given order
+    for index in two_composition(order, max_order):
+        # Compute the values derivative of the product
+        dcoefs_order += diffprodTree([S_dcoefs[max_order[0] - index[0]],
+                                      C_dcoefs[max_order[1] - index[1]]], N)
+    return dcoefs_order
+
+
+class _SequentialExecutor():
+    """Context manager that mimic ProcessPoolExecutor without new process.
+
+    Could work even if charpol involved petsc objects.
+    """
+    def __init__(self, *args,  **kargs):
+        pass
+
+    def __enter__(self, *args, **kargs):
+        return self
+
+    def __exit__(*exc_info):
+        pass
+
+    @staticmethod
+    def map(fun, *iterable, **kargs):
+        """Wrap the builtin function `map`."""
+        return map(fun, *iterable)
+
 
 class CharPol():
     r"""
@@ -148,6 +181,7 @@ class CharPol():
         C._finalize_init()
         return C
 
+
     @classmethod
     def _from_recursive_mult(cls, dLambda, nu0=None, block_size=3):
         """Define factory method to create recursively CharPol from the lambdas.
@@ -196,6 +230,7 @@ class CharPol():
 
         # Return the final product
         return prod[block_list[0]]
+
 
     def __repr__(self):
         """Define the representation of the class."""
@@ -305,7 +340,7 @@ class CharPol():
         # Return the successive derivative of the polynomial coef, no factorial !!
         return dcoef_pol
 
-    def multiply(self, C):
+    def multiply(self, C, max_workers=None):
         """Multiply this polynomial by another Charpol Object.
 
         The two CharPol object must be computed at the same `nu0` value and the
@@ -318,10 +353,20 @@ class CharPol():
         Depending of the number of terms, this appraoch may be faster than
         using Vieta formula when the number of eigenvalue increases.
 
+        The number of process involved in the computation is defined in EasterEig
+        options file and can be set using `ee.options.gopts['max_workers_mult'] = 4`.
+        The default is 1. For better performance, use the number of cores.
+        If `eig` object involve petsc matrices and collective executions,
+        it may fail with value different from 1.
+
         Parameters
         ----------
         C : CharPol
             The second polynomial.
+        max_workers : int, optional
+            The number of process involved in the computation. The default is `None`.
+            If `None` it use the valuefrom `ee.options.gopts['max_worker_mult']`.
+            This argument is mainly intent for testing.
 
         Returns
         -------
@@ -339,6 +384,15 @@ class CharPol():
         # Check derivatives order are the same
         if self.dcoefs[0].shape != C.dcoefs[0].shape:
             raise ValueError('The number of derivative should be the same for both polynomial')
+        # Use the default the number of workers
+        if max_workers is None:
+            max_workers = gopts['max_workers_mult']
+        # If max_workers is 1, define a context manager to avoid the initialization
+        # of the ProcessPoolManager
+        if max_workers == 1:
+            PoolExecutor = _SequentialExecutor
+        else:
+            PoolExecutor = ProcessPoolExecutor
 
         total_order = len(self.dcoefs) + len(C.dcoefs) - 2
         max_order = (len(self.dcoefs) - 1, len(C.dcoefs) - 1)
@@ -357,17 +411,16 @@ class CharPol():
         # Compute the polynomial coef `dcoefs`
         # In CharPol these coefs are in descending order such,
         #    a_0 lda**N + ... + a_N lda**0
-        for order in range(total_order, -1, -1):
-            # Local coeff for summation
-            dcoefs_order = np.zeros(shape, dtype=complex)
-            # Get all combinaisons of with 2 coefficients to have exactly the given order
-            for index in two_composition(order, max_order):
-                # print(order, index, (max_order[0] - index[0], max_order[1] - index[1]))
-                # Compute the values derivative of the product
-                dcoefs_order += diffprodTree([S_dcoefs[max_order[0] - index[0]],
-                                              C_dcoefs[max_order[1] - index[1]]], N)
-            # dcoefs should be a Taylor series, need to divide by factorial
-            dcoefs.append(dcoefs_order * F)
+        __dprod = partial(_dprod, S_dcoefs=S_dcoefs, C_dcoefs=C_dcoefs,
+                          max_order=max_order, shape=shape, N=N)
+        order_range = np.arange(total_order, -1, -1)
+        with PoolExecutor(max_workers=max_workers) as executor:
+            # for results in map(__dprod, order_range):
+            for results in executor.map(__dprod, order_range):
+                # Local coeff for summation
+                dcoefs_order = results
+                # dcoefs should be a Taylor series, need to divide by factorial
+                dcoefs.append(dcoefs_order * F)
 
         # Merge both dLambda for the new instance
         dLambda = []
@@ -1009,7 +1062,7 @@ class CharPol():
         else:
             raise NotImplementedError('The request algorithm `{}` is not recognized.'.format(algorithm))
 
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
             for s in executor.map(_p_newton,
                                   it.product(*grid),
                                   chunksize=1):
