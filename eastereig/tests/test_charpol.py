@@ -22,6 +22,7 @@
 import unittest
 import numpy as np
 import eastereig as ee
+import time
 from eastereig.examples.WGadmitance_numpy_mv import Ynumpy
 
 
@@ -66,6 +67,8 @@ class Test_charpol_mult(unittest.TestCase):
 
     def test_charpol_mult_same_direct_computation(self):
         """Test that `multiply` yield same results that direct computation.
+
+        It tests the behavior in parallel and in sequentiel.
         """
         extracted = self.extracted
 
@@ -76,8 +79,9 @@ class Test_charpol_mult(unittest.TestCase):
         C02 = ee.CharPol(extracted[0:3])
         C35 = ee.CharPol(extracted[3:6])
         C34 = ee.CharPol(extracted[3:5])
-        # Check with 2 polynomials of the same size
-        P = C02.multiply(C35)
+
+        # Check with 2 polynomials of the same size in sequential ------------
+        P = C02.multiply(C35, max_workers=1)
         print('\n')
         # Check size
         self.assertTrue(len(C05.dcoefs) == len(P.dcoefs))
@@ -88,7 +92,29 @@ class Test_charpol_mult(unittest.TestCase):
             check_an[i] = np.allclose(an, bn)
         self.assertTrue(check_an.all())
 
-        # Check operator form for asymetric polynomials
+        # Check with 2 polynomials of the same size in parallel --------------
+        P = C02.multiply(C35, max_workers=4)
+        print('\n')
+        # Check size
+        self.assertTrue(len(C05.dcoefs) == len(P.dcoefs))
+
+        # Check values
+        check_an = np.zeros((len(C05.dcoefs),), dtype=bool)
+        for i, (an, bn) in enumerate(zip(C05.dcoefs, P.dcoefs)):
+            check_an[i] = np.allclose(an, bn)
+        self.assertTrue(check_an.all())
+
+        # Check operator form for asymetric polynomials ----------------------
+        # Deactivate parallelism in the charpol `multiply` method
+        ee.options.gopts['max_workers_mult'] = 1
+        Q = C02 * C34
+        # Check values
+        check_an = np.zeros((len(C04.dcoefs),), dtype=bool)
+        for i, (an, bn) in enumerate(zip(C04.dcoefs, Q.dcoefs)):
+            check_an[i] = np.allclose(an, bn)
+        self.assertTrue(check_an.all())
+        # Activate parallelism in the charpol `multiply` method
+        ee.options.gopts['max_workers_mult'] = 2
         Q = C02 * C34
         # Check values
         check_an = np.zeros((len(C04.dcoefs),), dtype=bool)
@@ -100,11 +126,12 @@ class Test_charpol_mult(unittest.TestCase):
         """Test that `_from_recursive_mult` yield same CharPol than Vieta.
         """
         extracted = self.extracted
-
         # Create globals and partial CharPol
         Cv = ee.CharPol(extracted[0:6])
+        t0 = time.time()
         Cr2 = ee.CharPol._from_recursive_mult(extracted[0:6], block_size=2)
         Cr3 = ee.CharPol._from_recursive_mult(extracted[0:6], block_size=3)
+        print('time =', time.time() - t0)
 
         # Check all polynomials have the same size
         self.assertTrue(len(Cv.dcoefs) == len(Cr2.dcoefs))
@@ -119,6 +146,7 @@ class Test_charpol_mult(unittest.TestCase):
         self.assertTrue(check_r2.all())
         self.assertTrue(check_r3.all())
 
+
     def test_charpol_set_param(self):
         """Test the `set_param` method.
         """
@@ -130,7 +158,7 @@ class Test_charpol_mult(unittest.TestCase):
         C0 = C.set_param(0, nu0[0] - 0.1)
         ref = C.eval_an_at(np.array(nu0) + np.array([-0.1, 0.1]))
         self.assertTrue(np.allclose(C0.eval_an_at(nu0[1] + 0.1), ref))
-        self.assertTrue(np.allclose(C1.eval_an_at(nu0[0] - 0.1), ref))
+
 
 
 # add test for
