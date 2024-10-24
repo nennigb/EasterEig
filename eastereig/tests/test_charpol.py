@@ -123,14 +123,14 @@ class Test_charpol_mult(unittest.TestCase):
         self.assertTrue(check_an.all())
 
     def test_factory_from_recursive_mult(self):
-        """Test that `_from_recursive_mult` yield same CharPol than Vieta.
+        """Test that `from_recursive_mult` yield same CharPol than Vieta.
         """
         extracted = self.extracted
         # Create globals and partial CharPol
         Cv = ee.CharPol(extracted[0:6])
         t0 = time.time()
-        Cr2 = ee.CharPol._from_recursive_mult(extracted[0:6], block_size=2)
-        Cr3 = ee.CharPol._from_recursive_mult(extracted[0:6], block_size=3)
+        Cr2 = ee.CharPol.from_recursive_mult(extracted[0:6], block_size=2)
+        Cr3 = ee.CharPol.from_recursive_mult(extracted[0:6], block_size=3)
         print('time =', time.time() - t0)
 
         # Check all polynomials have the same size
@@ -152,7 +152,7 @@ class Test_charpol_mult(unittest.TestCase):
         """
         extracted = self.extracted
         # Create globals and partial CharPol
-        C = ee.CharPol._from_recursive_mult(extracted[0:4])
+        C = ee.CharPol.from_recursive_mult(extracted[0:4])
         nu0 = C.nu0
         C1 = C.set_param(1, nu0[1] + 0.1)
         C0 = C.set_param(0, nu0[0] - 0.1)
