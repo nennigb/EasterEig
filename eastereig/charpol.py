@@ -939,7 +939,7 @@ class CharPol():
         Parameters
         ----------
         bounds : iterable
-            each item must contains the 2 bounds in the complex plane. For
+            Each item must contains the 2 corners in the complex plane. For
             instance if bounds = [(-1-1j, 1+1j), (-2-2j, 2+2j)],
             the points will be put in this C**2 domain.
             Althought nu is relative to nu0, absolute value have to be used.
@@ -973,6 +973,10 @@ class CharPol():
         os.environ["OMP_NUM_THREADS"] = "1"
         ```
         """
+        if len(bounds) != len(self.nu0) + 1:
+            raise IndexError('The length of `bounds` must match the number'
+                             ' of unknown ({}).'.format(len(self.nu0) + 1))
+
         def param_mesh(bound, Npts):
             Re, Im = np.meshgrid(np.linspace(bound[0].real, bound[1].real, Npts),
                                  np.linspace(bound[0].imag, bound[1].imag, Npts))
