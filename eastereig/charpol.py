@@ -1061,12 +1061,15 @@ class CharPol():
             _p_newton = partial(self.lm_from_sol, tol=tol, verbose=verbose)
         else:
             raise NotImplementedError('The request algorithm `{}` is not recognized.'.format(algorithm))
-
+        total = np.prod([len(g) for g in grid])
+        pbar = tqdm.tqdm(total=total, position=0, leave=True)
+        chunksize = 100
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             for s in executor.map(_p_newton,
                                   it.product(*grid),
-                                  chunksize=1):
+                                  chunksize=chunksize):
                 all_sol.append(s)
+                pbar.update()
 
         # Filter all solution to keep only unique
         # Remove None and convert to array
