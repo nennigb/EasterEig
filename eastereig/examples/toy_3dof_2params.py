@@ -25,33 +25,30 @@ X---/\/\---|    m1    | -----/\/\----- |    m2    | -----/\/\-----|    m3    | -
            |          |                |          |               |          |
            +~~~O~~~O~~+                +~~~O~~~O~~+               +~~~O~~~O~~+
 ```
-depending of two complex parameters mu and nu.
-We would like to find the EP3.
+depending on the two complex parameters mu and nu. We would like to find the EP3.
+
+Examples
+--------
+>>> C, sol, error = main() # doctest: +ELLIPSIS
+> Solve gen eigenvalue problem with NumpyEigSolver class...
+>>> error < 1e-3
+True
 
 @author: bn
 """
 import numpy as np
 import eastereig as ee
-import matplotlib.pyplot as plt
-from bruteforce import bruteForceSolvePar
 import itertools as it
 import concurrent.futures
 from functools import partial
-
-try:
-    import sympy as sym
-    sym.init_printing(forecolor='White')
-except ImportError():
-    print('sympy is needed for testing')
+from scipy.spatial import distance_matrix
+from scipy.optimize import linear_sum_assignment
+import sympy as sym
+from sympy.solvers.polysys import solve_generic
 
 
 class Network(ee.OPmv):
-    """Create a subclass of the interface class OP that describe the problem
-    operator.
-
-    Remarks
-    -------
-    It is not possible to have nu0 between a node and the ground!"""
+    """Create subclass of OPmv that describe the multiparameter problem."""
 
     def __init__(self, nu0):
         """Initialize the problem.
@@ -59,7 +56,7 @@ class Network(ee.OPmv):
         Parameters
         ----------
             nu0 : tuple
-                the parameters initial Values (complex)
+                The parameters initial Values (complex).
         """
         self.m = 1
         self.k = 1
@@ -82,32 +79,27 @@ class Network(ee.OPmv):
         self.flda = [None, ee.lda_func.Lda]
         # ---------------------------------------------------------------------
 
-    # possible to add new methods
     def __repr__(self):
-        """Define the object representation.
-        """
+        """Define the object representation."""
         text = "Instance of Operator class {} @nu0={}."
-
         return text.format(self.__class__.__name__, self.nu0)
 
     def _mass(self):
-        """ Define the a diagonal mass matrix.
-        """
+        """Define the a diagonal mass matrix."""
         m = self.m
         M = - np.array([[m, 0, 0],
                        [0, m, 0],
-                       [0, 0, m]], dtype=np.complex)
+                       [0, 0, m]], dtype=complex)
         return M
 
     def _stiff(self):
-        """Define the stifness matrix of 1D FEM with ordered nodes.
-        """
+        """Define the stifness matrix of 1D FEM with ordered nodes."""
         mu = self.nu0[0]
         nu = self.nu0[1]
         k = self.k
         K = np.array([[mu+k, -k, 0.],
                       [-k, 2*k, -k],
-                      [0., -k, nu+k]], dtype=np.complex)
+                      [0., -k, nu+k]], dtype=complex)
         return K
 
     def _dstiff(self, m, n):
@@ -125,21 +117,19 @@ class Network(ee.OPmv):
         Kn : Matrix (petsc or else)
             The n-derivative of global K0 matrix
         """
-        k = self.k
         mu, nu = self.nu0
 
         if (m, n) == (0, 0):
             Kn = self.K[0]
         elif (m, n) == (1, 0):
-            Kn = np.zeros_like(self.K[0], dtype=np.complex)
+            Kn = np.zeros_like(self.K[0], dtype=complex)
             Kn[0, 0] = 1.
         elif (m, n) == (0, 1):
-            Kn = np.zeros_like(self.K[0], dtype=np.complex)
+            Kn = np.zeros_like(self.K[0], dtype=complex)
             Kn[2, 2] = 1.
         # if (m, n) > (1, 1) return 0 because K has a linear dependancy on nu
         else:
             return 0
-
         return Kn
 
     def _dmass(self, m, n):
@@ -161,18 +151,19 @@ class Network(ee.OPmv):
         else:
             return 0
 
+
 def _inner(l, N, var, nu, mu):
-    """ Inner loop for sympy_check. Usefull for // computation.
-    """
-    dlda = np.zeros(N, dtype=np.complex)
+    """Inner loop for sympy_check. Usefull for // computation."""
+    dlda = np.zeros(N, dtype=complex)
     for n in it.product(*map(range, N)):
         print(n)
         dlda[n] = sym.N(sym.diff(l, mu, n[0], nu, n[1]).subs(var))
     return dlda
 
-def sympy_check(nu0, sympyfile):
-    """ Check multiple derivatives with sympy.
-    
+
+def sympy_check(nu0, sympyfile=None):
+    """Check multiple derivatives with sympy.
+
     Parameters
     ----------
     n0 : tuple
@@ -225,133 +216,84 @@ def sympy_check(nu0, sympyfile):
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         for i, dlda_ in enumerate(executor.map(_inner_lda, ldas)):
             dlda[i] = dlda_
+    if sympyfile:
+        np.savez(sympyfile, dlda=dlda)
+    return dlda, EP_sym, g
 
-    np.savez(sympyfile, dlda=dlda)
 
-    return dlda, EP_sym
+sol_ana = np.array([[2. - 1.77635684e-15j, 1. + 1.41421356e+00j, 1. - 1.41421356e+00j],
+                    [2. + 1.77635684e-15j, 1. - 1.41421356e+00j, 1. + 1.41421356e+00j],
+                    [2. - 1.73205081e+00j, 0.5-2.59807621e+00j, 1.5-2.59807621e+00j],
+                    [2. + 1.73205081e+00j, 0.5+2.59807621e+00j, 1.5+2.59807621e+00j],
+                    [2. - 1.73205081e+00j, 1.5-2.59807621e+00j, 0.5-2.59807621e+00j],
+                    [2. + 1.73205081e+00j, 1.5+2.59807621e+00j, 0.5+2.59807621e+00j]])
 
-def sympy_jac_check(p0, nu, val):
-    """ Validation of Jacobian matrix computation
 
-    val : iterable
-        absolute value of the paramter.
+def error_between(sol1, sol2):
+    """Evalute the error between two sets of unordered vectors.
+
+    Parameters
+    ----------
+    sol1 : np.array
+        Array wih m1 lines of n-dimentional solution.
+    sol1 : np.array
+        Array wih m2 lines of n-dimentional solution.
+
+    Returns
+    -------
+    error : float
+        The global error between the two set using the best permutation.
     """
-
-    gens = p0.gens
-    lda, nu0, nu1 = gens
-    N = len(val)
-    val = np.array(val)
-    val[1::] = val[1::] - np.array(nu)
-    P = [p0.diff((lda, i)) for i in range(0, N)]
-    J = np.zeros((N, N), dtype=np.complex)
-    v = np.zeros((N,), dtype=np.complex)
-    for row in range(0, N):
-        v[row] = np.complex(P[row].subs(dict(zip(gens, val))))
-        for col in range(0, N):
-            J[row, col] = np.complex(sym.diff(P[row], gens[col]).subs(dict(zip(gens, val))))
-    return J, v
+    D = distance_matrix(sol1, sol2)
+    row_ind, col_ind = linear_sum_assignment(D)
+    error = D[row_ind, col_ind].sum()
+    return error
 
 
+def main(plot=False):
+    """Find the EP3 of the 3 DOF problem.
 
-
-# %% MAIN
-    
-if __name__ == '__main__':
-
-
-    from scipy import optimize
-    from sympy.solvers.polysys import solve_generic
-    np.set_printoptions(linewidth=150)
+    Return
+    ------
+    sol : np.array
+        Fhe EP3 solutions. For each solution, it constains the eigenvalue, mu and nu.
+    error : float
+        The global error between the found EP3 and analytic solution.
+    """
+    # Define the order of derivation for each parameter
     Nderiv = (5, 5)
-    # tuple of the inital param
-    nu0 = (1., 1.) # problem si (1, 1)
-    # Sympy check parameters
-    sym_check = False
-    sympyfile =  'sympy_dlda'
-
-    # %% Locate EP
+    # Define the inital value of parameter
+    nu0 = np.array([0.95590969 - 1.48135044j + 0.15 + 0.1j,
+                    1. + 1.41421356e+00j + 0.1 + 0.1j])
+    # Instiate the problem
     net = Network(nu0)
-
     net.createSolver(pb_type='gen')
-    # run the eigenvalue computation
+    # Run the eigenvalue computation
     Lambda = net.solver.solve(target=0+0j)
-    # create a list of the eigenvalue to monitor
+    # Create a list of the eigenvalue to monitor
     lda_list = np.arange(0, 3)
-    # return the eigenvalue and eigenvector in a list of Eig object
+    # Return the eigenvalue and eigenvector in a list of Eig object
     extracted = net.solver.extract(lda_list)
     # destroy solver (important for petsc/slepc)
     net.solver.destroy()
-    print('> Eigenvalue :', Lambda)
-
+    # Compute the eigenvalue derivatives
     for vp in extracted:
         vp.getDerivativesMV(Nderiv, net)
-
+    # Find EP with Charpol
     C = ee.CharPol(extracted)
-    p0, variables = ee.CharPol.taylor2sympyPol(C.dcoefs)
-    _lda, _nu0, _nu1 =  variables
-    # check eval_at method
-
-    # Need to add a test
-    # vals = (1. +1j, 0.7+1j, -1.2+1j)
-    vals = (1.+1j, 0.7-1j, -1.2+0.3j)  # absolute !
-    cp = C.eval_at(vals)
-    p0_ = p0.subs({_lda:vals[0], _nu0: vals[1]-nu0[0], _nu1: vals[2]-nu0[0]})
-    J = C.jacobian(vals)
-    Jsym, vsym = sympy_jac_check(p0, nu0, vals)
-    print('> Erreur J vs Jsym :', np.linalg.norm(J-Jsym))
-    print('> Erreur p vs psym :', np.abs(cp-p0_))
-    v = C.EP_system(vals)
-    # s = C._newton(C.EP_system, C.jacobian, vals, tol=1e-6, verbose=True)
-    val_ep = np.array((2.0000000000001172-1.73205080756872j,
-                        0.5000000000000471-2.598076211353326j,
-                        1.499999999999996-2.5980762113533107j))
-    # test NR
-    sol = C.newton(((1-2j, 3+3j),
-                    (-3-3j, 3+3j),
-                    (-3-3j, 3+3j)), decimals=8, max_workers=4)
+    # Use homotopy solver (if installed)
+    # bplp, s = C.homotopy_solve(tracktol=1e-12, finaltol=1e-13, tol_filter=-1)
+    s = C.iterative_solve((None,
+                          (nu0 - (1+1j), nu0 + (1+1j)),
+                          (nu0 - (1+1j), nu0 + (1+1j))), Npts=2, algorithm='lm', max_workers=4, tol=1e-5)
+    delta, sol, deltaf = C.filter_spurious_solution(s, plot=plot, tol=1e-3)
+    return C, sol, error_between(sol, sol_ana)
+    # Export a sympy poly object
 
 
-    # recover the good polynomial
-    # sym.roots(p0.subs({_nu0: 0, _nu1: 0}))
-    # @nu0=(0.5, 0.7). Eigenvalue : [0.36708537+0.j 1.60198927+0.j 3.23092537+0.j]
-    # sym.roots(p0.subs({nu0: -0.5, nu1: -0.3}))
-
-    # sol = C.groebner_solve()
-    # # get derivativ of allupto
-    # dLambda=[]
-    # for i, vp in enumerate(extracted):
-    #     print('> Get derivative vp {} ...\n'.format(i))
-    #     tic = time.time()  # init timer
-    #     vp.getDerivatives(Nderiv, net)
-    #     print("              derivative real time :", time.time() - tic)  # stop timer
-    #     print(vp.dlda)
-    #     dLambda.append(np.array(vp.dlda))
-    #     if export:
-    #         vp.export(name + '_vp_' + str(i), eigenvec=False)
-    # %% Check with sympy
-    if sym_check:
-        dlda_ref, EP_sym = sympy_check(nu0, sympyfile)
-        # computed for mu=nu=1
-        """
-        /!\ wrong sign here
-        dlda_ref[0].real
-        array([[-3.41421356, -0.25      , -0.22097087, -0.1875    , -0.02900243],
-               [-0.25      ,  0.13258252,  0.0625    , -0.06214806, -0.28125   ],
-               [-0.22097087,  0.0625    ,  0.10358009,  0.09375   , -0.22204983],
-               [-0.1875    , -0.06214806,  0.09375   ,  0.39425174,  0.5625    ],
-               [-0.02900243, -0.28125   , -0.22204983,  0.5625    ,  3.47561795]])
-
-        dlda_ref[1].real
-        array([[-0.58578644, -0.25      ,  0.22097087, -0.1875    ,  0.02900243],
-               [-0.25      , -0.13258252,  0.0625    ,  0.06214806, -0.28125   ],
-               [ 0.22097087,  0.0625    , -0.10358009,  0.09375   ,  0.22204983],
-               [-0.1875    ,  0.06214806,  0.09375   , -0.39425174,  0.5625    ],
-               [ 0.02900243, -0.28125   ,  0.22204983,  0.5625    , -3.47561795]])
-
-        dlda_ref[2].real
-        array([[-2.00000000e+00, -5.00000000e-01, -8.39220777e-18,  3.75000000e-01,  7.55586683e-18],
-               [-5.00000000e-01,  4.02810988e-18, -1.25000000e-01,  8.51605573e-18,  5.62500000e-01],
-               [-8.39220777e-18, -1.25000000e-01,  3.71511123e-18, -1.87500000e-01,  7.77698184e-18],
-               [ 3.75000000e-01,  1.80035419e-18, -1.87500000e-01,  6.16975297e-17, -1.12500000e+00],
-               [ 7.55586683e-18,  5.62500000e-01, -3.48957050e-17, -1.12500000e+00, -7.23310784e-16]])
-        """
+# %% MAIN
+if __name__ == '__main__':
+    C, sol, error = main(plot=True)
+    print('Found EP3:')
+    print(sol)
+    print('Error between found EP and analytic solution: ', error)
