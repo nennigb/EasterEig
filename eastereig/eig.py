@@ -840,7 +840,7 @@ class NumpyEig(AbstractEig):
             self.dx.append(u.copy()[:-1])
             # print(n, ' ')
 
-    def getDerivativesMV(self, N, op):
+    def getDerivativesMV(self, N, op, timeit=False):
         """ Compute the successive derivative of an eigenvalue of an OP instance
 
         Parameters
@@ -849,6 +849,8 @@ class NumpyEig(AbstractEig):
             the number derivative to compute
         op: OPmv
             the operator OP instance that describe the eigenvalue problem
+        timeit: bool
+            Unused for this class.
 
         RHS derivative must start at n=1 for 1st derivatives
         """
@@ -917,7 +919,7 @@ class NumpyEig(AbstractEig):
                 # store the value
                 self.dlda[n] = derivee
                 self.dx[n] = u.copy()[:-1]
-        print(self.dlda)
+        # print(self.dlda)
 
 # end class NumpyEig
 
@@ -1042,7 +1044,7 @@ class ScipyspEig(AbstractEig):
 
         print('\n')
 
-    def getDerivativesMV(self, N, op):
+    def getDerivativesMV(self, N, op, timeit=False):
         """ Compute the successive derivative of an eigenvalue of an OP instance
 
         Parameters
@@ -1051,6 +1053,8 @@ class ScipyspEig(AbstractEig):
             the number derivative to compute
         op: OPmv
             the operator OP instance that describe the eigenvalue problem
+        timeit: bool
+            Unused for this class.
 
         RHS derivative must start at n=1 for 1st derivatives
         """
