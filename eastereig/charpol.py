@@ -630,9 +630,9 @@ class CharPol():
         self._dlda_prod = np.cumprod(DA, 0)
 
         # Create Coefficients used nu_i derivatives
-        self._der_coef = np.empty((N, N), dtype=np.object)
-        self._da_slice = np.empty((N, N), dtype=np.object)
-        self._da_shape = np.empty((N, N), dtype=np.object)
+        self._der_coef = np.empty((N, N), dtype=object)
+        self._da_slice = np.empty((N, N), dtype=object)
+        self._da_shape = np.empty((N, N), dtype=object)
         # Loop of the derivative of P, fill J raws
         for row in range(0, N):
             # loop over the nu variables, fill column
