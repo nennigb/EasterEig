@@ -2,31 +2,34 @@ EasterEig
 =========
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![CI-Ubuntu](https://github.com/nennigb/EasterEig/actions/workflows/ci-ubuntu.yml/badge.svg)](https://github.com/nennigb/EasterEig/actions/workflows/ci-ubuntu.yml) [![pypi release](https://img.shields.io/pypi/v/eastereig.svg)](https://pypi.org/project/eastereig/)
 
-
-
-Consider a parametric eigenvalue problem depending on a parameter $$\nu$$. This arises for instance in
+Consider a **parametric eigenvalue problem** depending on one scalar $\nu$ or given vector $\boldsymbol\nu =(\nu_1,\nu_2,\ldots,\nu_N) \in \mathbb{C}^N$ of paramaters. This arises for instance in
 
   - waveguides, where the _wavenumber_ (eigenvalue) depends on the frequency (parameter)
-  - waveguides with absorbing materials on the wall, where _modal attenuation_ (eigenvalue imaginary part) depends on the liner properties like impedance, density (parameter)
-  - structural dynamics with a randomly varying parameter, where the _resonances frequencies_ (eigenvalue) depend on the parameter
+  - waveguides with absorbing materials on the wall, where _modal attenuation_ (eigenvalue imaginary part) depends on the liner properties like impedance, admittance, density (parameter)
+  - structural dynamics with a randomly varying parameter, where the _resonances frequencies_ (eigenvalue) depend on for instance of material parameters like Young modulus or density
   - ...
 
-Exceptional points (EP) of non-Hermitian systems correspond to particular values of the parameter leading to defective eigenvalue.
-At EP, both eigenvalues and eigenvectors are merging. 
+The aim of this package is to **reconstruct** the eigenvalue loci and to **locate** exceptional points (EPs). The EPs in non-Hermitian systems correspond to particular values of the parameters leading to defective eigenvalue. At EPs, both eigenvalues and eigenvectors are merging.
 
-The aim of this package is to **locate** exceptional points and to **reconstruct** the eigenvalue loci. The theoretical part of this work is described in [1], as for the location of _exceptional points_ and illustrated in [2] for eigenvalues reconstruction in structural dynamics.
+![Riemann surfaces around an EP2.](figures/EP2_light.png)  ![Riemann surfaces around an EP3.](figures/EP3_light.png)
 
-The method requires the computation of successive derivatives of two selected eigenvalues with respect to the parameter so that, after recombination, regular functions can be constructed. This algebraic manipulation enables
- * exceptional points (EP) localization, using standard root-finding algorithms; 
- * computation of the associated Puiseux series up to an arbitrary order.
+The theoretical parts of this work are described in [1] for the location of _exceptional points_ and in [2] for eigenvalues reconstruction. The extension to several parameters is presented in [3].
+
+The method requires the computation of successive derivatives of some selected eigenvalues with respect to the parameter so that, after recombination, regular functions can be constructed. This algebraic manipulation overcomes the convergence limits of conventional due to the singularity branch point. This enables
+ * Fast approximation of eigenvalues, converging over a large region of parametric space
+ * High order EP localization
+ * Computation of the associated Puiseux series up to an arbitrary order
+ * Numerical representation of the problem discrimiant and of the partial characteristic polynomial
   
-This representation, which is associated with the topological structure of Riemann surfaces, allows to efficiently approximate the selected pair in a certain neighborhood of the EP.
-
 To use this package :
 
-  1. an access to the **operator derivative** must be possible
-  2. the eigenvalue problem must be recast into
-  		\[ \mathbf{L} (\lambda(\nu), \nu) \mathbf{x} (\nu) =\mathbf{0}  \]
+  1. An access to the **operator derivative** with respect to $\boldsymbol\nu$ is required
+  2. The parametric eigenvalue problem must have the form
+$$\mathbf{L} (\lambda(\boldsymbol\nu), \boldsymbol\nu) \mathbf{x} (\boldsymbol\nu) =\mathbf{0},$$
+where, for a given vector $\boldsymbol\nu$ which contains $N$ independent complex-valued parameters, $\lambda(\boldsymbol\nu)$ is an eigenvalue and $\mathbf{x}(\boldsymbol\nu)\neq \mathbf{0}$ is the associated right eigenvector. Here the matrix $\mathbf{L}$ admits the decomposition
+$$\mathbf{L} (\lambda, \boldsymbol\nu)  =\sum_{i \geq 0} f_i(\lambda) \mathbf{K}_i(\boldsymbol\nu)$$
+where $f_i$ is a polynomial function and matrices $\mathbf{K}_i$
+are supposed to be an analytic function of the parameters vector $\boldsymbol\nu$.
 
 The matrices of discrete operators can be either of numpy type for _full_, scipy type for _sparse_ or petsc mpiaij type for _sparse parallel_ matrices.
 
@@ -38,11 +41,54 @@ References
    [1] B. Nennig and E. Perrey-Debain. A high order continuation method to locate exceptional points and to compute Puiseux series with applications to acoustic waveguides. J. Comp. Phys., 109425, (2020). [[doi](https://dx.doi.org/10.1016/j.jcp.2020.109425)]; [[open access](https://arxiv.org/abs/1909.11579)]
 
    [2] M. Ghienne and B. Nennig. Beyond the limitations of perturbation methods for real random eigenvalue problems using Exceptional Points and analytic continuation. Journal of Sound and vibration, (2020). [[doi](https://doi.org/10.1016/j.jsv.2020.115398)]; [[open access](https://hal.archives-ouvertes.fr/hal-02536849)]
+   
+   [3] B. Nennig, E. Perrey-Debain, Martin Ghienne. Localization of high order exceptional points : applications to acoustic waveguides. 16ème Congrès Français d’Acoustique, Apr 2022, Marseille, France.  [[open access](https://hal.science/hal-03838635v1/document)]
        
+Install 
+--------
+
+`eastereig` is based on numpy (full) and scipy (sparse) for most internal computation and can handle _large_ parallel sparse matrices thanks to **optional** import of [petsc4py (>=3.20)](https://petsc.org/release/petsc4py/install.html) (and mumps), 
+[slepc4py](https://slepc4py.readthedocs.io/en/stable/install.html) and
+and [mpi4py](https://mpi4py.readthedocs.io/en/stable/install.html). As non-hermitian problems involve complex-valued eigenvalues, computations are realized with complex arithmetic and the **complex petsc version** is expected.
+[sympy](https://docs.sympy.org) is used for formal manipulation of multivariate polynomials.
+Riemann surface can also be plotted using the `Loci` class either with `matplotlib` or with [`pyvista`](https://github.com/pyvista/pyvista) and and `pyvistaqt` (optional).
+
+Before installing `eastereig`, you'll need python (tested for v >= 3.8), and to install manually optional dependencies you need:
+* The python packages `pypolsys` (optional homotopy EP solver) available from https://github.com/nennigb/pypolsys
+* The python packages `pyvista` and `pyvistaqt` (optional Riemann surfaces plotting)
+* The python package `petsc4py` and `slepc4py` (optional sparse parallel matrices surpport)
+* A fortran compiler (optional, tested with gfortran)
+* Install `scikit-umfpack` to improve `scipy.sparse` LU factorization performance (optional)
+
+**Other dependencies will be installed automatically**.
+
+By default, the fortan evaluation of multivariate polynomial is deactivated. To enable it, you need a fortran compiler and to set the environment variable: `EASTEREIG_USE_FPOLY=True`. On ubuntu like system, run
+```console
+export EASTEREIG_USE_FPOLY=True
+```
+Then, you can install `eastereig` either from pypi (main releases only):
+```console
+pip install eastereig [--user]
+``` 
+or from github (more updates):
+```console
+pip install path/to/EasterEig-version.tar.gz [--user]
+```
+Note that on ubuntu, you will need to use `pip3` instead of `pip` and `python3` instead of `python`. Please see the steps given in the continous integration script [workflows](.github/workflows/ci-ubuntu.yml).
+We recommend installing `eastereig` in virtual environemment unless you know what you are doing.
+
+Running tests
+-------------
+Tests are handled with `doctest` and with `unittest`
+
+To execute the full test suite, run :
+```console
+python -m eastereig
+```
+
 
 Basic workflow and class hierarchy
 ----------------------------------
-
 `eastereig` provides several top level classes:
 
   1. **OP class**, defines operators of your problem
@@ -51,71 +97,90 @@ Basic workflow and class hierarchy
   4. **EP class**, combines Eig object to locate EP and compute Puiseux series
   5. **Loci class**, stores numerical value of eigenvalues loci and allows easy Riemann surface plotting
 
-Dependencies
--------------
 
-`eastereig` is based on numpy (full) and scipy (sparse) for most internal computation and can handle _large_ parallel sparse matrices thanks to **optional** import of [petsc4py](https://petsc4py.readthedocs.io/en/stable/install.html) (and mumps), 
-[slepc4py](https://slepc4py.readthedocs.io/en/stable/install.html) and
-and [mpi4py](https://mpi4py.readthedocs.io/en/stable/install.html). As non-hermitian problems involve complex-valued eigenvalues, computations are realized with complex arithmetic and the **complex petsc version** is expected.
-[sympy](https://docs.sympy.org) is used for formal manipulation of multivariate polynomials.
-Riemann surface can also be plotted using the `Loci` class either with `matplotlib` or with [`pyvista`](https://github.com/pyvista/pyvista) and and `pyvistaqt` (optional).
+Getting started
+---------------
+Several working examples are available in `./examples/` folder
+  
+  1. Acoustic waveguide with an impedance boundary condition (with the different supported linear libraries)
+  2. 3-dof toy model of a structure with one random parameter (with numpy)
+  3. 3-dof toy with two parameters leading to EP3
+  4. ...
 
 > **Remarks :**
 > To run an example with petsc (parallel), you need to run python with `mpirun` (or `mpiexec`). For instance, to run a program with 2 proc
 > `mpirun -n 2 python myprog.py`
 
-Install 
---------
+To get started, the first step is to define your problem. Basically it means to link the discrete operators (matrices) and their derivatives to the `eastereig` OP class.
+The problem has to be recast in the following form:
 
-Before installing `eastereig`, you'll need: 
-* python (tested for v >= 3.5);
-* python packages: numpy, setuptools, wheel
-* pip (optional).
-* fortran compiler (optional)
-* install `scikit-umfpack` to improve `scipy.sparse` LU factorization performance (optional)
-Note that on ubuntu, you will need to use `pip3` instead of `pip` and `python3` instead of `python`. Please see the steps given in the continous integration script [workflows](.github/workflows/ci-ubuntu.yml).
-
-
-By default, the fortan evaluation of multivariate polynomial is desactivated. To enable it, set the environnement variable: `EASTEREIG_USE_FPOLY=True`. On ubuntu like system, run
-```console
-export EASTEREIG_USE_FPOLY=True
+```math
+\left[\underbrace{1}_{f_0(\lambda)=1} \mathbf{K}_0(\nu) + \underbrace{\lambda(\nu)}_{f_1(\lambda)=\lambda} \mathbf{K}_1(\nu) + \underbrace{\lambda(\nu)^2}_{f_2(\lambda)=\lambda^2} \mathbf{K}_2(\nu) \right] \mathbf{x} =  \mathbf{0}.
 ```
 
-### Using pip (preferred)
-Consider using `pip` over custom script (rationale [here](https://pip.pypa.io/en/stable/reference/pip_install/)). 
-
-You can install `eastereig` either from pypi (main releases only):
-```console
-pip install eastereig [--user]
-``` 
-or from github:
-```console
-pip install path/to/EeasterEig-version.tar.gz [--user]
+Matrices are then stacked in the variable `K`
+```python
+K = [K0, K1, K2].
 ```
-or in _editable_ mode if you want to modify the sources
-```console
-pip install -e path/to/EeasterEig
+**The functions** that return the derivatives with respect to $$\nu$$ of each matrices have to be put in `dK`. The prototype of this function is fixed (the parameter n corresponds to the derivative order) to ensure automatic computation of the operator derivatives.
+```python
+dK = [dK0, dK1, dK2].
 ```
-
-### Using python setuptools
-Go to root folder.
-and run:
-```console
-python setup.py install [--user]
+Finally, **the functions** that returns derivatives with respect to $\lambda$ are stored in 'flda'
+```python
+flda = [None, ee.lda_func.Lda, ee.lda_func.Lda2].
 ```
+Basic linear and quadratic dependency are defined in the module `lda_func`. Others dependencies can be easily implemented; provided that the appropriate eigenvalue solver is also implemented). The `None` keyword is used when there is no dependency to the eigenvalue, e. g. $\mathbf{K}_0$.
 
-To get the lastest updates (dev releases), run: 
-```console
-python setup.py develop [--user]
-```
+This formulation is used to automatically compute (i) the successive derivatives of the operator and (ii) the RHS associated to the bordered matrix.
 
-Running tests
--------------
-Tests are handled with doctest. 
+These variables are defined by creating **a subclass** that inherits from the eastereig **OP class** (`OPmv` for the multivariate case). For example, considering a generalized eigenvalue problem $$\left[\mathbf{K}_0(\nu) + \lambda \mathbf{K}_1(\nu) \right] \mathbf{x} =  \mathbf{0} $$:
 
-To execute the full test suite, run :
-```console
-python -m eastereig
+```python
+import eastereig as ee
+
+class MyOP(ee.OP):
+    """Create a subclass of the OP class to describe your problem with scalar parameter."""
+
+    def __init__(self, z, ...):
+        """Initialize the problem."""
+        # Initialize OP interface
+        self.setnu0(z)
+        
+        # Mandatory -----------------------------------------------------------
+        self._lib='scipysp' # 'numpy' or 'petsc'
+        # Create the operator matrices
+        self.K = self.CreateMyMatrix()
+        # Define the list of function to compute the derivatives of each operator matrix (assume 2 here)
+        self.dK = [self.dmat0, self.dmat1]        
+        # Define the list of functions to set the eigenvalue dependency of each operator matrix
+        self.flda = [None, ee.lda_func.Lda] 
+        # ---------------------------------------------------------------------
+
+    def CreateMyMatrices(self, ...):
+        """Create my matrices and return a list."""
+ 		...
+    	return list_of_Ki
+    
+    def dmat0(self, n):
+        """Return the matrix derivative with respect to nu.
+
+		N.B. : The prototype of this function is fixed, the n parameter
+		stands for the derivative order. If the derivative is null,
+		the function returns the value 0.
+		"""
+		...
+		return dM0
+    
+    def dmat1(self, n):
+        """Return the matrix derivative with respect to nu.
+
+		N.B. : The prototype of this function is fixed, the n parameter
+		stands for the derivative order. If the derivative is null,
+		the function returns the value 0.
+		"""
+		...
+		return dM1
 ```
 
 Documentation
@@ -141,84 +206,6 @@ N.B: Class diagram generation is done using `pyreverse` (installed with pylint a
 Both aspects are included in the `makedoc.py' script. So, just run :
 ```console
 python ./makedoc.py
-```
-
-Getting started
----------------
-
-Several working examples are available in `./examples/` folder
-  
-  1. Acoustic waveguide with an impedance boundary condition (with the different supported linear libraries)
-  2. 3-dof toy model of a structure with one random parameter (with numpy)
-
-To get started, the first step is to define your problem. Basically it means to link the discrete operators (matrices) and their derivatives to the `eastereig` OP class.
-The problem has to be recast in the following form:
-
-$$ \left[ \underbrace{1}_{f_0(\lambda)=1} \mathbf{K}_0(\nu) + \underbrace{\lambda(\nu)}_{f_1(\lambda)=\lambda} \mathbf{K}_1(\nu) + \underbrace{\lambda(\nu)^2}_{f_2(\lambda)} \mathbf{K}_2(\nu) \right] \mathbf{x} =  \mathbf{0} $$.
-
-Matrices are then stacked in the variable `K`
-```python
-K = [K0, K1, K2].
-```
-**The functions** that return the derivatives with respect to $$\nu$$ of each matrices have to be put in `dK`. The prototype of this function is fixed (the parameter n corresponds to the derivative order) to ensure automatic computation of the operator derivatives.
-```python
-dK = [dK0, dK1, dK2].
-```
-Finally, **the functions** that returns derivatives with respect to $$\lambda$$ are stored in 'flda'
-```python
-flda = [None, ee.lda_func.Lda, ee.lda_func.Lda2].
-```
-Basic linear and quadratic dependency are defined in the module `lda_func`. Others dependencies can be easily implemented; provided that the appropriate eigenvalue solver is also implemented). The `None` keyword is used when there is no dependency to the eigenvalue, e. g. $$\mathbf{K}_0$$.
-
-This formulation is used to automatically compute (i) the successive derivatives of the operator and (ii) the RHS associated to the bordered matrix.
-
-These variables are defined by creating **a subclass** that inherits from the eastereig **OP class**. For example, considering a generalized eigenvalue problem $$\left[\mathbf{K}_0(\nu) + \lambda \mathbf{K}_1(\nu) \right] \mathbf{x} =  \mathbf{0} $$:
-
-```python
-import eastereig as ee
-
-class MyOP(ee.OP):
-    """Create a subclass of the OP class to describe your problem."""
-
-    def __init__(self):
-        """Initialize the problem."""
-        # Initialize OP interface
-        self.setnu0(z)
-        
-        # Mandatory -----------------------------------------------------------
-        self._lib='scipysp' # 'numpy' or 'petsc'
-        # Create the operator matrices
-        self.K = self.CreateMyMatrix()
-        # Define the list of function to compute the derivatives of each operator matrix (assume 2 here)
-        self.dK = [self.dmat0, self.dmat1]        
-        # Define the list of functions to set the eigenvalue dependency of each operator matrix
-        self.flda = [None, ee.lda_func.Lda] 
-        # ---------------------------------------------------------------------
-
-    def CreateMyMatrices(self,...):
-        """Create my matrices and return a list."""
- 		...
-    	return list_of_Ki
-    
-    def dmat0(self,n):
-        """Return the matrix derivative with respect to nu.
-
-		N.B. : The prototype of this function is fixed, the n parameter
-		stands for the derivative order. If the derivative is null,
-		the function returns the value 0.
-		"""
-		...
-		return dM0
-    
-    def dmat1(self,n):
-        """Return the matrix derivative with respect to nu.
-
-		N.B. : The prototype of this function is fixed, the n parameter
-		stands for the derivative order. If the derivative is null,
-		the function returns the value 0.
-		"""
-		...
-		return dM1
 ```
 
 How to contribute ?
