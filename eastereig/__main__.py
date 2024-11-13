@@ -36,6 +36,8 @@ from eastereig import _petscHere
 from eastereig.examples import WGimpedance_numpy
 from eastereig.examples import WGimpedance_scipysp
 from eastereig.examples import ThreeDoF
+from eastereig.examples import toy_3dof_2params
+from eastereig.examples import WGadmitance_numpy_mv
 from eastereig import utils
 from eastereig import loci
 from eastereig import ep
@@ -54,8 +56,9 @@ if _petscHere:
     from eastereig.examples import WGimpedance_petsc
 
 # Explicitely list modules with doctest
-mod_list = [lda_func, utils, loci, ep, eigSolvers, WGimpedance_numpy,
-            WGimpedance_scipysp, ThreeDoF, fpoly, charpol]
+mod_list = [lda_func, utils, loci, ep, eigSolvers, fpoly, charpol,
+            WGimpedance_numpy, WGimpedance_scipysp, ThreeDoF,
+            toy_3dof_2params, WGadmitance_numpy_mv]
 if _petscHere:
     petsc_list = [WGimpedance_petsc]
     mod_list.extend(petsc_list)
