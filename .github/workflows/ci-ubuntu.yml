@@ -4,11 +4,11 @@ name: CI-Ubuntu
 
 on:
   push:
-    branches: [ '*' ]
     paths-ignore:         # Skip CI in this case
       - README.md
   pull_request:
-    branches: [ master ]
+    branches: 
+      - master
   schedule:
     # * is a special character in YAML so you have to quote this string
     # run at 02:01 on the 10th of each month
