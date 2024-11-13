@@ -23,8 +23,12 @@ import unittest
 import numpy as np
 import eastereig as ee
 import time
-from eastereig.examples.WGadmitance_numpy_mv import Ynumpy
-
+import tempfile
+from os import path
+from eastereig.examples.WGadmitance_numpy_mv import Ynumpy, nu_ref
+from scipy.spatial import distance_matrix
+from scipy.optimize import linear_sum_assignment
+from importlib.util import find_spec as _find_spec
 
 class Test_charpol_mult(unittest.TestCase):
     """Define multinomial multiindex coefficients test cases.
@@ -146,7 +150,6 @@ class Test_charpol_mult(unittest.TestCase):
         self.assertTrue(check_r2.all())
         self.assertTrue(check_r3.all())
 
-
     def test_charpol_set_param(self):
         """Test the `set_param` method.
         """
@@ -159,11 +162,36 @@ class Test_charpol_mult(unittest.TestCase):
         ref = C.eval_an_at(np.array(nu0) + np.array([-0.1, 0.1]))
         self.assertTrue(np.allclose(C0.eval_an_at(nu0[1] + 0.1), ref))
 
+    def test_load_and_export(self):
+        """Test the `load` and `export` method.
+        """
+        extracted = self.extracted
+        filename = 'PCP.npz'
+        # Create globals and partial CharPol
+        C = ee.CharPol.from_recursive_mult(extracted[0:4])
+        C_lda = C.eval_lda_at(C.nu0 + 0.1)
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            C.export(path.join(tmpdirname, filename))
+            C2 = ee.CharPol.load(path.join(tmpdirname, filename))
+            C2_lda = C2.eval_lda_at(C2.nu0 + 0.1)
+        C_lda.sort()
+        C2_lda.sort()
+        self.assertTrue(np.allclose(C_lda, C2_lda))
+
+    @unittest.skipUnless(_find_spec('pypolsys'), 'pypolsys is an optional solver')
+    def test_homotopy_solver(self):
+        """Test the homotopy (optional) EP solver.
+        """
+        C = ee.CharPol.from_recursive_mult(self.extracted[0:5])
+        bplp, s = C.homotopy_solve(tracktol=1e-12, finaltol=1e-13, tol_filter=-1)
+        delta, sol, deltaf = C.filter_spurious_solution(s, plot=False, tol=1e-1)
+        # Compute error with reference solution
+        D = distance_matrix(sol[:, 1][:, None], nu_ref[:, None])
+        row_ind, col_ind = linear_sum_assignment(D)
+        error = D[row_ind, col_ind].sum()
+        self.assertTrue(error < 5e-2)
 
 
-# add test for
-# load export
-# that CharPol coef0 return the good lda for all constructor
 if __name__ == '__main__':
     # run unittest test suite
     unittest.main()
