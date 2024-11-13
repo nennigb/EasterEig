@@ -19,7 +19,7 @@
 """
 # Define CharPol class and auxilliary classes.
 
-This class handle with the **partial characteristic polynomial**.
+This class implements the **partial characteristic polynomial**.
 This polynomial is built from Vieta formulas and from the successive
 derivatives of a selected set of eigenvalues.
 [Vieta' formulas](https://en.wikipedia.org/wiki/Vieta%27s_formulas)
@@ -180,7 +180,6 @@ class CharPol():
         C._finalize_init()
         return C
 
-
     @classmethod
     def from_recursive_mult(cls, dLambda, nu0=None, block_size=3):
         """Define factory method to create recursively CharPol from the lambdas.
@@ -230,7 +229,6 @@ class CharPol():
         # Return the final product
         return prod[block_list[0]]
 
-
     def __repr__(self):
         """Define the representation of the class."""
         return "Instance of {}  @nu0={} with #{} derivatives and #{} eigs.".format(self.__class__.__name__,
@@ -279,7 +277,7 @@ class CharPol():
 
     @staticmethod
     def vieta(dLambda):
-        """Compute the sucessive derivatives of the polynomial coefficients knowning
+        """Compute the sucessive derivatives of the polynomial coefficients knowing
         its roots and their successive derivatives.
 
         The methods is based on the Vieta formulas see for instance
@@ -550,9 +548,6 @@ class CharPol():
         v = [p0, p1, ... pn]^t, where pi = d^ip0/dlda^i.
 
         Generically, this système yields to a finite set of EP.
-
-        # TODO need to add a test (validated in toy_3doy_2params)
-        # may be also obtain with the jacobian matrix....
 
         Parameters
         ----------
@@ -985,7 +980,7 @@ class CharPol():
         return self.iterative_solve(*args, **kargs)
 
     def iterative_solve(self, bounds, Npts=4, decimals=4, max_workers=4, tol=1e-4,
-                        verbose=False, algorithm='nr'):
+                        verbose=False, algorithm='nr', chunksize=100):
         """Mesh parametric space and run iterative solver to find EP in parallel.
 
         Parameters
@@ -1011,6 +1006,9 @@ class CharPol():
         algorithm : string
             Can be either 'nr' for Newton-Raphson, either 'lm' for Levenberg-Marquard.
             The second is often more robust.
+        chunksize : int
+            The size of computation grouped together and sent to workers for
+            parallel execution.
 
         Returns
         -------
@@ -1062,7 +1060,6 @@ class CharPol():
             raise NotImplementedError('The request algorithm `{}` is not recognized.'.format(algorithm))
         total = np.prod([len(g) for g in grid])
         pbar = tqdm.tqdm(total=total, position=0, leave=True)
-        chunksize = 100
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             for s in executor.map(_p_newton,
                                   it.product(*grid),
@@ -1082,7 +1079,7 @@ class CharPol():
                        dense=True, bplp_max=2000, oo_tol=1e-5, only_bezout=False, tol_filter=1e-12):
         """Solve EP system by homotopy method.
 
-        Require the install of `pypolsys`.         
+        Require `pypolsys` python package.
         This method defines a simplified interface to `pypolsys` homotopy
         solver. Such solver allow to find *all solutions* of the polynomial
         systems. An upper bound of the number of solution is given by
@@ -1141,8 +1138,6 @@ class CharPol():
         # Convert to sympy
         p0, variables = self.taylor2sympyPol(self.dcoefs, tol=tol_filter)
         _lda, *_ = variables
-        deg = self._an_taylor_order
-
         # Build the system
         polys = []
         _lda = p0.gens[0]
@@ -1296,7 +1291,6 @@ class CharPol():
         # TODO is there a best order ?
         # FIXME add a truncation flag to sparsify
         coef_dict = dict()
-        N = len(coef_list)
         # Store all coefs in a dict²
         for n, c in enumerate(reversed(coef_list)):
             for index, dc in np.ndenumerate(c):
@@ -1310,7 +1304,6 @@ class CharPol():
         # Use the dict to create a sympy Poly expression
         variables = sym.symbols(var_string)
         P = sym.Poly(coef_dict, variables, domain='CC')
-
         return P, variables
 
     def getdH(self):
@@ -1421,7 +1414,6 @@ class CharPol():
 
     def discriminant(self, nu):
         r"""Compute the discriminant from the coefficient and the Sylvester matrix.
-
 
         If we consider a polynom p, with coefficients an, the discriminant is given
         $$
