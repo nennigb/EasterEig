@@ -49,7 +49,6 @@ import pickle
 # from numpy.polynomial.polynomial import polyval
 # import numpy.polynomial.polyutils as pu
 from eastereig.fpoly import polyvalnd
-import pypolsys
 from matplotlib import pyplot as plt
 
 
@@ -1083,6 +1082,7 @@ class CharPol():
                        dense=True, bplp_max=2000, oo_tol=1e-5, only_bezout=False, tol_filter=1e-12):
         """Solve EP system by homotopy method.
 
+        Require the install of `pypolsys`.         
         This method defines a simplified interface to `pypolsys` homotopy
         solver. Such solver allow to find *all solutions* of the polynomial
         systems. An upper bound of the number of solution is given by
@@ -1133,6 +1133,11 @@ class CharPol():
             the number of rows may be less than `bplp`.
             If `bplp > bplp_max`, `r` is None.
         """
+        try:
+            import pypolsys
+        except ModuleNotFoundError:
+            print('The module `pypolsys` is not installed.',
+                  ' Install it or use `iterative_solve`.')
         # Convert to sympy
         p0, variables = self.taylor2sympyPol(self.dcoefs, tol=tol_filter)
         _lda, *_ = variables
