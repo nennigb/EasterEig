@@ -787,9 +787,9 @@ class ScipyspEig(AbstractEig):
 
             tic = time.time()  # init timer
             if n == 1:
-                # umfpack is not in scipy but need to be installed with scikit-umfpack
-                # if not present, scipy use superlu
-                sp.sparse.linalg.use_solver(useUmfpackbool=True)
+                # umfpack is not included in scipy but can be used with scikit-umfpack.
+                # umfpack is the default choice when available. If not, scipy uses superlu
+                # sp.sparse.linalg.use_solver(useUmfpack=True)
                 # compute the lu factor
                 lusolve = sp.sparse.linalg.factorized(Bord)
 
