@@ -72,6 +72,7 @@ You'll need :
 * python packages: numpy, setuptools, wheel
 * pip (optional).
 * fortran compiler (optional)
+* install `scikit-umfpack` to improve `scipy.sparse` LU factorization performance (optional)
 Note that on ubuntu, you will need to use `pip3` instead of `pip` and `python3` instead of `python`. Please see the steps given in the continous integration script [workflows](.github/workflows/ci-ubuntu.yml).
 
 
