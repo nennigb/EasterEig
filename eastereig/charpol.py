@@ -465,7 +465,7 @@ class CharPol():
         N = len(self.nu0)
         # Create slices accounting for truncation
         if isinstance(param_truncation, int):
-            slices = (slice(0, param_truncation),) * (N - 1)
+            slices = (slice(0, param_truncation),) * (N )
         elif hasattr(param_truncation, '__iter__'):
             slices = tuple([slice(0, i) for i in param_truncation])
         else:
