@@ -141,7 +141,15 @@ class CharPol():
             dLambda = [np.array(vp.dlda) for vp in dLambda]
         else:
             TypeError('Unsupported type for `dLambda` elements.')
-        return dLambda, nu0
+
+        # Convert nu0 as an np.Array
+        try:
+            _ = iter(nu0)
+            nu0_ = np.array(nu0, dtype=complex)
+        except TypeError:
+            nu0_ = np.array([nu0], dtype=complex)
+
+        return dLambda, nu0_
 
     def _finalize_init(self):
         """Finalize CharPol initialization."""
