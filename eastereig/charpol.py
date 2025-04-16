@@ -27,6 +27,7 @@ derivatives of a selected set of eigenvalues.
 """
 import numpy as np
 from numpy.linalg import norm
+import numpy.polynomial as pol
 import itertools as it
 from collections import deque
 from eastereig.eig import AbstractEig
@@ -1381,7 +1382,7 @@ class CharPol():
         # Derivate the product of h_i
         dH = diffprodTree(dh, N)
         # dH is the successive derivative, div by factorial to get TH
-        TH = Taylor(div_factorial(dH), self.nu0)
+        TH = Discr(div_factorial(dH), self.nu0)
         return TH
 
     def associate_lda_to_nu(self, nu_ep, tol=1e-3):
@@ -1599,7 +1600,8 @@ class CharPol():
                 dcoef_r[p, n] = Taylor._radii_fit_1D(an[tuple(index)], plot=plot)
         for p in range(0, an.ndim):
             R[p] = {'mean': dcoef_r[p, :].mean(),
-                    'std': dcoef_r[p, :].std()}
+                    'std': dcoef_r[p, :].std(),
+                    'min': dcoef_r[p, :].min()}
         return R
 
     def explore(self, index, bounds, nu=None, nvals=51):
@@ -1644,3 +1646,45 @@ class CharPol():
         LAMBDA_pcp = np.array(LAMBDA_pcp.tolist())
         loci_pcp = Loci(LAMBDA_pcp, Nu)
         return loci_pcp
+
+
+class Discr(Taylor):
+    """Numerical representation of a Taylor expansion of the discriminant.
+    """
+
+    def locate(self, plot=False):
+        """Find EP locations for univariate case only.
+        Parameters
+        ----------
+        plot: bool
+            If true, plot the roots of the discriminant compare to truncated version
+            to identify the spurious roots.
+
+        Return
+        ------
+        r: array
+            The roots represent all EP2 candodates sorted with descending sensitivity.
+            The roots are express in an absolute way, ie nu0 is already included.
+        s: array
+            The sensitivity of each roots.
+        """
+        # Check the shape
+        if len(self.nu0) > 1:
+            raise ValueError(f'This method works only for univariate case. Found {len(self.nu0)}')
+        # Use new numpy polynomial API
+        p = pol.Polynomial(self.an)
+        p1 = pol.Polynomial(self.an[:-1])
+        r = p.roots()
+        dp1 = p1.deriv()
+        s = np.zeros_like(r)
+        for i, ri in enumerate(r):
+            s[i] = abs(p1(ri)/dp1(ri))
+        # Sort the roots from the most genuine to the most spurious
+        index = np.argsort(s)
+        r = r[index] + self.nu0
+        if plot:
+            r1 = p1.roots() + self.nu0
+            plt.figure()
+            plt.plot(r.real, r.imag, 'k.')
+            plt.plot(r1.real, r1.imag, 'bo', markerfacecolor='none')
+        return r, s
