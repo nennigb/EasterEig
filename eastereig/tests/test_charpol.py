@@ -26,12 +26,13 @@ import time
 import tempfile
 from os import path
 from eastereig.examples.WGadmitance_numpy_mv import Ynumpy, nu_ref
+from eastereig.examples.WGimpedance_numpy import Znumpy, z_ref
 from scipy.spatial import distance_matrix
 from scipy.optimize import linear_sum_assignment
 from importlib.util import find_spec as _find_spec
 
 class Test_charpol_mult(unittest.TestCase):
-    """Define multinomial multiindex coefficients test cases.
+    """Define multivariate charpol test cases.
     """
     @classmethod
     def setUpClass(cls):
@@ -70,7 +71,7 @@ class Test_charpol_mult(unittest.TestCase):
         self.imp = imp
 
     def test_charpol_mult_same_direct_computation(self):
-        """Test that `multiply` yield same results that direct computation.
+        """Test that `multiply` yields the same results that the direct computation.
 
         It tests the behavior in parallel and in sequentiel.
         """
@@ -127,7 +128,7 @@ class Test_charpol_mult(unittest.TestCase):
         self.assertTrue(check_an.all())
 
     def test_factory_from_recursive_mult(self):
-        """Test that `from_recursive_mult` yield same CharPol than Vieta.
+        """Test that `from_recursive_mult` yields the same CharPol than Vieta.
         """
         extracted = self.extracted
         # Create globals and partial CharPol
@@ -190,6 +191,70 @@ class Test_charpol_mult(unittest.TestCase):
         row_ind, col_ind = linear_sum_assignment(D)
         error = D[row_ind, col_ind].sum()
         self.assertTrue(error < 5e-2)
+
+
+class Test_charpol_uni(unittest.TestCase):
+    """Define univariate charpol test cases.
+    """
+    @classmethod
+    def setUpClass(cls):
+        print('\n> Tests of ', cls.__name__)
+
+    def setUp(self):
+        # Number of derivative
+        Nderiv = 12
+        # air properties
+        rho0, c0 = 1.2, 340.
+        # initial imepdance guess
+        z0 = 486.198103097114 + 397.605679264872j
+        # freq. of computation
+        f = 200
+        # number of dof
+        N = 50
+        # duct height
+        h = 1.
+        # number of mode to compute
+        Nmodes = 5
+        # solve the problem
+        omega = 2*np.pi*f
+        k0 = omega/c0
+        # Create discrete operator of the pb
+        imp = Znumpy(z=z0, n=N, h=h, rho=rho0, c=c0, k=k0)
+        print(imp)
+        # initialize eigenvalue solver for *generalized eigenvalue problem*
+        imp.createSolver(pb_type='gen')
+        # run the eigenvalue computation
+        Lambda = imp.solver.solve(nev=Nmodes, target=0+0j, skipsym=False)
+        # return the eigenvalue and eigenvector in a list of Eig object
+        extracted = imp.solver.extract(range(0, Nmodes+1))
+        # destroy solver (important for petsc/slepc)
+        imp.solver.destroy()
+        # Get eigenvalues derivatives
+        for vp in extracted:
+            vp.getDerivatives(Nderiv, imp)
+
+        # Store them
+        self.extracted = extracted
+        self.imp = imp
+
+    def test_charpol_uni_with_ref(self):
+        """Test that Charpol can find EP for impedance test case.
+        """
+        # Locate EP using Charpol
+        C = ee.CharPol.from_recursive_mult(self.extracted)
+        bplp, sol_h = C.homotopy_solve(tracktol=1e-14, finaltol=1e-8, tol_filter=-1)
+        delta, sol, delta_sol = C.filter_spurious_solution(sol_h, plot=False, tol=1)
+        # Check if charpol find the EP
+        self.assertTrue(np.allclose(sol[:, 1], np.array(z_ref[:sol.shape[0]]), rtol=1e-2, atol=-1))
+
+    def test_dh_uni_with_ref(self):
+        """Test that dh can find EP for impedance test case.
+        """
+        # Locate EP using Charpol
+        C = ee.CharPol.from_recursive_mult(self.extracted)
+        dh = C.getdH()
+        r, s = dh.locate()
+        self.assertTrue(np.allclose(r[0], np.array(z_ref[0])))
 
 
 if __name__ == '__main__':

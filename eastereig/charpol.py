@@ -1685,6 +1685,9 @@ class Discr(Taylor):
         if plot:
             r1 = p1.roots() + self.nu0
             plt.figure()
+            variable = r'\nu'
             plt.plot(r.real, r.imag, 'k.')
             plt.plot(r1.real, r1.imag, 'bo', markerfacecolor='none')
+            plt.xlabel(r'$\mathrm{Re}\,' + variable + r' $')
+            plt.ylabel(r'$\mathrm{Im}\,' + variable + r' $')
         return r, s
