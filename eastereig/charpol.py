@@ -370,7 +370,7 @@ class CharPol():
             The second polynomial.
         max_workers : int, optional
             The number of process involved in the computation. The default is `None`.
-            If `None` it use the valuefrom `ee.options.gopts['max_worker_mult']`.
+            If `None` it use the value from `ee.options.gopts['max_workers_mult']`.
             This argument is mainly intent for testing.
 
         Returns
@@ -917,7 +917,7 @@ class CharPol():
             computation fail.
         """
         # set max iteration number
-        niter_max = 150
+        niter_max = 100
         # Def few local function
         def to_z(x):
             """Convert the in-lined real and imag unknown `x` to complex unknown."""
@@ -1079,8 +1079,9 @@ class CharPol():
         # Remove None and convert to array
         sol_ = np.array([s for s in all_sol if s is not None])
         # Use unique to remove duplicated row
-        sol = np.unique(sol_.round(decimals=decimals), axis=0)
+        _, indu = np.unique(sol_.round(decimals=decimals), axis=0, return_index=True)
         print('> ', time.time() - tic, ' s in iterative `{}` solver.'.format(algorithm))
+        sol = sol_[indu, :]
         return sol
 
     def homotopy_solve(self, degree=None, tracktol=1e-12, finaltol=1e-8, singtol=1e-14,
