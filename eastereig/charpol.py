@@ -1075,8 +1075,8 @@ class CharPol():
         print('> ', time.time() - tic, ' s in iterative `{}` solver.'.format(algorithm))
         return sol
 
-    def homotopy_solve(self, degree=None, tracktol=1e-5, finaltol=1e-10, singtol=1e-14,
-                       dense=True, bplp_max=2000, oo_tol=1e-5, only_bezout=False, tol_filter=1e-12):
+    def homotopy_solve(self, degree=None, tracktol=1e-12, finaltol=1e-8, singtol=1e-14,
+                       dense=True, bplp_max=2000, oo_tol=1e-5, only_bezout=False, tol_filter=-1):
         """Solve EP system by homotopy method.
 
         Require `pypolsys` python package.
@@ -1086,15 +1086,18 @@ class CharPol():
         the Bezout number, equal to the product of the degrees each polynomials.
         This number may be huge.
         Here, we use a m-homogeneous variable partition to limit the number of
-        spurious solution 'at infinty' to track. The number of paths is given
+        spurious solutions 'at infinty' to track. The number of paths is given
         by `bplp` and can be obtained without performing the tracking by setting
         `only_bezout=True`.
-        This method is interesting because all solution are found, whereas
-        for Newton-Raphson method.
+        This method is interesting because all solutions are found, whereas
+        for iterative methods like Newton-Raphson or Levenberg-Marquard.
 
         Parameters
         ----------
-        tracktol : float
+        degree : iterable, optional
+            The maximum degree to keep for each variable. Default is `None` and all
+            terms are kept.
+        tracktol : float, optional
             is the local error tolerance allowed the path tracker along
             the path.
         finaltol : float, optional
@@ -1102,7 +1105,7 @@ class CharPol():
             for both the absolute and relative errors in a mixed error criterion.
         singtol : float, optional
             is the singularity test threshold used by SINGSYS_PLP.  If
-            INGTOL <= 0.0 on input, then SINGTOL is reset to a default value.
+            SINGTOL <= 0.0 on input, then SINGTOL is reset to a default value.
         dense : bool, optional
             If `True`, evaluate the polynomial using the fastermultivariate Horner
             scheme, optimized for dense polynomial. Else, monomial evaluation
@@ -1134,7 +1137,7 @@ class CharPol():
             import pypolsys
         except ModuleNotFoundError:
             print('The module `pypolsys` is not installed.',
-                  ' Install it or use `iterative_solve`.')
+                  ' Install it or use `iterative_solve` method.')
         # Convert to sympy
         p0, variables = self.taylor2sympyPol(self.dcoefs, tol=tol_filter)
         _lda, *_ = variables
