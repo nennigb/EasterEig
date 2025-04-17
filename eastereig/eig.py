@@ -42,7 +42,7 @@ from eastereig import _petscHere, gopts, _CONST
 from eastereig.utils import pade, Taylor
 from numpy.distutils.misc_util import is_sequence
 
-if _petscHere: 
+if _petscHere:
     from slepc4py import SLEPc
     from petsc4py import PETSc
     from mpi4py import MPI  # TODO find a workaround
@@ -154,15 +154,34 @@ class AbstractEig(ABC):
             self.dx.extend(dx)
 
     @abstractmethod
-    def getDerivatives(self, N, L):
-        """ Compute the successive derivative of an eigenvalue of an OP instance
+    def getDerivatives(self, N, L, timeit=False):
+        """Compute the successive derivative of an eigenvalue of an OP instance.
 
         Parameters
-        -----------
+        ----------
         N: int
-            the number derivative to compute
+            The number derivative to compute.
         L: OP
-            the operator OP instance that describe the eigenvalue problem
+            The operator OP instance that describe the eigenvalue problem.
+        timeit : bool, optional
+            If `True` it activates textual profiling outputs. Default is `False`.
+
+        RHS derivative must start at n=1 for 1st derivatives
+        """
+        pass
+
+    @abstractmethod
+    def getDerivativesMV(self, N, L, timeit=False):
+        """Compute the successive derivatives of an eigenvalue of a multivariate OPmv instance.
+
+        Parameters
+        ----------
+        N: int
+            The number derivative to compute.
+        L: OP
+            The operator OP instance that describe the eigenvalue problem.
+        timeit : bool, optional
+            If `True` it activates textual profiling outputs. Default is `False`.
 
         RHS derivative must start at n=1 for 1st derivatives
         """
@@ -600,16 +619,16 @@ class PetscEig(AbstractEig):
             Print('\n')
 
     def getDerivativesMV(self, N, op, timeit=False):
-        """Compute the successive derivative of an eigenvalue of an OP instance.
+        """Compute the successive derivatives of an eigenvalue of a multivariate OPmv instance.
 
         Parameters
         -----------
         N: int
-            The number derivative to compute
+            The number derivative to compute.
         L: OPmv
-            The operator OP instance that describe the eigenvalue problem
-        timeit : bool
-            A flag to activate textual profiling outputs. Default is `False`.
+            The operator OP instance that describe the eigenvalue problem.
+        timeit : bool, optional
+            If `True` it activates textual profiling outputs. Default is `False`.
 
         RHS derivative must start at n=1 for 1st derivatives
         """
@@ -670,7 +689,7 @@ class PetscEig(AbstractEig):
         # getSubVector :
         # This function may return a subvector without making a copy, therefore it
         # is not safe to use the original vector while modifying the subvector.
-        # Other non-overlapping subvectors can still be obtained from X using this function.        
+        # Other non-overlapping subvectors can still be obtained from X using this function.
 
         # if N > 1 loop for higher order terms
         Print('> Linear solve...')
@@ -688,13 +707,13 @@ class PetscEig(AbstractEig):
                 PETSc.garbage_cleanup(comm)
                 if timeit:
                     Print("              # getRHS real time :", time.time()-tic)
-    
+
                 Fnest = PETSc.Vec().createNest([Ftemp, Zero])
                 # monolithique (no copy)
                 # getArray Returns a pointer to a contiguous array that contains this processor's
                 # portion of the vector data
                 F = PETSc.Vec().createWithArray(Fnest.getArray())  # don't forget () !
-    
+
                 # n=0 get LU and solve, then solve with stored LU
                 # solution u contains [dx, dlda])
                 tic = time.time()  # init timer
@@ -707,7 +726,7 @@ class PetscEig(AbstractEig):
                 # self.dlda.append( np.asscalar( u[ind[0][1].getIndices()] ) )     # get value from IS, pb car //
                 # get value from IS
                 derivee = u[ind[0][1].getIndices()]
-    
+
                 if len(derivee) == 0:
                     derivee = np.array([0.], dtype=np.complex64)
                 # send the non empty value to all process
@@ -778,20 +797,20 @@ class NumpyEig(AbstractEig):
         self.x = x
         self._lib = f['lib']
 
-
-    def getDerivatives(self, N, op):
-        """ Compute the successive derivative of an eigenvalue of an OP instance
+    def getDerivatives(self, N, op, timeit=False):
+        """Compute the successive derivative of an eigenvalue of an OP instance.
 
         Parameters
-        -----------
+        ----------
         N: int
-            the number derivative to compute
+            The number derivative to compute.
         op: OP
-            the operator OP instance that describe the eigenvalue problem
+            The operator OP instance that describe the eigenvalue problem.
+        timeit: bool
+            Unused for this class.
 
         RHS derivative must start at n=1 for 1st derivatives
         """
-
         # get nu0 value where the derivative are computed
         self.nu0 = op.nu0
         # construction de la matrice de l'opérateur L, ie L.L
@@ -841,10 +860,10 @@ class NumpyEig(AbstractEig):
             # print(n, ' ')
 
     def getDerivativesMV(self, N, op, timeit=False):
-        """ Compute the successive derivative of an eigenvalue of an OP instance
+        """Compute the successive derivatives of an eigenvalue of a multivariate OPmv instance.
 
         Parameters
-        -----------
+        ----------
         N: tuple of int
             the number derivative to compute
         op: OPmv
@@ -854,7 +873,6 @@ class NumpyEig(AbstractEig):
 
         RHS derivative must start at n=1 for 1st derivatives
         """
-
         # get nu0 value where the derivative are computed
         self.nu0 = op.nu0
         # construction de la matrice de l'opérateur L, ie L.L
@@ -905,7 +923,7 @@ class NumpyEig(AbstractEig):
                 # F= sp.bmat([Ftemp, Zerv]).reshape(-1,1)
                 F = np.concatenate((Ftemp, Zerv))
                 # print("              # getRHS real time :", time.time()-tic)
-    
+
                 tic = time.time()  # init timer
                 if sum(n) == 1:
                     # compute the lu factor
@@ -913,7 +931,7 @@ class NumpyEig(AbstractEig):
                 # Forward and back substitution, u contains [dx, dlda])
                 u = sp.linalg.lu_solve((lu, piv), F)
                 # print("              # solve LU real time :", time.time()-tic)
-    
+
                 # get lda^(n)
                 derivee = u[-1]
                 # store the value
@@ -979,15 +997,17 @@ class ScipyspEig(AbstractEig):
         self.x = x
         self._lib = f['lib']
 
-    def getDerivatives(self, N, op):
+    def getDerivatives(self, N, op, timeit=False):
         """ Compute the successive derivative of an eigenvalue of an OP instance
 
         Parameters
         -----------
         N: int
-            the number derivative to compute
+            The number derivative to compute.
         L: OP
-            the operator OP instance that describe the eigenvalue problem
+            The operator OP instance that describe the eigenvalue problem.
+        timeit : bool, optional
+            If `True` it activates textual profiling outputs. Default is `False`.
 
         RHS derivative must start at n=1 for 1st derivatives
         """
@@ -1021,7 +1041,8 @@ class ScipyspEig(AbstractEig):
             Ftemp = op.getRHS(self, n)
             # F= sp.bmat([Ftemp, Zerv]).reshape(-1,1)
             F = np.concatenate((Ftemp, Zerv))
-            print("              # getRHS real time :", time.time()-tic)
+            if timeit:
+                print("              # getRHS real time :", time.time()-tic)
 
             tic = time.time()  # init timer
             if n == 1:
@@ -1033,7 +1054,8 @@ class ScipyspEig(AbstractEig):
 
             # Forward and back substitution, u contains [dx, dlda])
             u = lusolve(F)
-            print("              # solve LU real time :", time.time()-tic)
+            if timeit:
+                print("              # solve LU real time :", time.time()-tic)
 
             # get lda^(n)
             derivee = u[-1]
@@ -1045,20 +1067,19 @@ class ScipyspEig(AbstractEig):
         print('\n')
 
     def getDerivativesMV(self, N, op, timeit=False):
-        """ Compute the successive derivative of an eigenvalue of an OP instance
+        """Compute the successive derivatives of an eigenvalue of a multivariate OPmv instance.
 
         Parameters
-        -----------
+        ----------
         N: tuple of int
             the number derivative to compute
         op: OPmv
             the operator OP instance that describe the eigenvalue problem
         timeit: bool
-            Unused for this class.
+            If `True` it activates textual profiling outputs. Default is `False`.
 
         RHS derivative must start at n=1 for 1st derivatives
         """
-
         # get nu0 value where the derivative are computed
         self.nu0 = op.nu0
         # construction de la matrice de l'opérateur L, ie L.L
@@ -1095,8 +1116,9 @@ class ScipyspEig(AbstractEig):
                 Ftemp = op.getRHS(self, n)
                 # F= sp.bmat([Ftemp, Zerv]).reshape(-1,1)
                 F = np.concatenate((Ftemp, Zerv))
-                print("              # getRHS real time :", time.time()-tic)
-    
+                if timeit:
+                    print("              # getRHS real time :", time.time()-tic)
+
                 tic = time.time()  # init timer
                 if sum(n) == 1:
                     # umfpack is not included in scipy but can be used with scikit-umfpack.
@@ -1104,11 +1126,12 @@ class ScipyspEig(AbstractEig):
                     # sp.sparse.linalg.use_solver(useUmfpack=True)
                     # compute the lu factor
                     lusolve = sp.sparse.linalg.factorized(Bord)
-    
+
                 # Forward and back substitution, u contains [dx, dlda])
                 u = lusolve(F)
-                print("              # solve LU real time :", time.time()-tic)
-    
+                if timeit:
+                    print("              # solve LU real time :", time.time()-tic)
+
                 # get lda^(n)
                 derivee = u[-1]
                 # store the value
