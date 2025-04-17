@@ -301,6 +301,9 @@ class AbstractEig(ABC):
         """
         # if points.dtype
         # points_ = points.astype(complex)
+        if is_sequence(self.nu0):
+            raise NotImplementedError(('Puiseux series works now only for scalar parameter.',
+                                       'Not for nu0={}'.format(self.nu0)))
         try:
             ep.a
         except:
