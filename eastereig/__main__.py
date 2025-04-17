@@ -38,6 +38,7 @@ from eastereig.examples import WGimpedance_scipysp
 from eastereig.examples import ThreeDoF
 from eastereig.examples import toy_3dof_2params
 from eastereig.examples import WGadmitance_numpy_mv
+from eastereig.examples import WGadmitance_scipy_mv
 from eastereig import utils
 from eastereig import loci
 from eastereig import ep
@@ -54,13 +55,14 @@ if np.lib.NumpyVersion(np.__version__) >= '2.0.0b1':
 
 if _petscHere:
     from eastereig.examples import WGimpedance_petsc
+    from eastereig.examples import WGadmitance_petsc_mv
 
 # Explicitely list modules with doctest
 mod_list = [lda_func, utils, loci, ep, eigSolvers, fpoly, charpol,
             WGimpedance_numpy, WGimpedance_scipysp, ThreeDoF,
-            toy_3dof_2params, WGadmitance_numpy_mv]
+            toy_3dof_2params, WGadmitance_numpy_mv, WGadmitance_scipy_mv]
 if _petscHere:
-    petsc_list = [WGimpedance_petsc]
+    petsc_list = [WGimpedance_petsc, WGadmitance_petsc_mv]
     mod_list.extend(petsc_list)
 
 if __name__ == '__main__':
