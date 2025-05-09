@@ -40,7 +40,6 @@ import itertools as it
 
 from eastereig import _petscHere, gopts, _CONST
 from eastereig.utils import pade, Taylor
-from numpy.distutils.misc_util import is_sequence
 
 if _petscHere:
     from slepc4py import SLEPc
@@ -48,6 +47,22 @@ if _petscHere:
     from mpi4py import MPI  # TODO find a workaround
     Print = PETSc.Sys.Print
     from ._petsc_utils import matrow, PETScVec2PETScMat
+
+
+def is_sequence(seq):
+    """Test if `seq` is a sequence.
+
+    Remarks
+    -------
+    Based on deprecated module from `numpy.distutils.misc_util.py`.
+    """
+    if isinstance(seq, str):
+        return False
+    try:
+        len(seq)
+    except Exception:
+        return False
+    return True
 
 
 def Eig(lib, *args, **kwargs):
