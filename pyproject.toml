@@ -1,0 +1,37 @@
+[build-system]
+build-backend = 'mesonpy'
+requires = ['meson-python>=0.15.0', 'cython', 'numpy']
+
+[project]
+name = 'eastereig'
+dynamic = ["version"]
+description = "A library to locate exceptional points and to reconstruct eigenvalues loci"
+readme = 'README.md'
+license = {file = 'LICENSE'}
+requires-python = '>=3.8'
+authors = [
+  {name = "B. Nennig", email = 'benoit.nennig@isae-supmeca.fr'},
+  {name = "M. Ghienne", email= 'martin.ghienne@isae-supmeca.fr'}
+]
+dependencies = [
+  'numpy',
+  'scipy',
+  'sympy>=1.4',
+  'matplotlib',
+  'pypolsys',
+  'tqdm'
+]
+classifiers = [
+  # How mature is this project?
+  "Development Status :: 5 - Production/Stable",
+  # Indicate who your project is intended for
+  "Topic :: Scientific/Engineering",  
+  # Specify the Python versions you support here.
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Operating System :: OS Independent",
+]
+
+[project.urls]
+homepage = "https://github.com/nennigb/EasterEig"
+
