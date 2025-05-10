@@ -38,10 +38,10 @@ import scipy as sp
 import numpy as np
 from eastereig.utils import faaDiBruno, diffprodTree
 
+
 # Linear dependancy in lda
 def Lda(k, n, dlda):
-    """
-    Compute the k-th derivative of lda(nu) with respect to nu.
+    """Compute the k-th derivative of lda(nu) with respect to nu.
 
     For multivariate case, the index `k` and `n` become tuple.
 
@@ -49,7 +49,7 @@ def Lda(k, n, dlda):
     to the RHS computation
 
     Parameters
-    -----------
+    ----------
     k : int or tuple
         The requested derivative order of the flda term
     n : int or tuple
@@ -73,22 +73,21 @@ def Lda(k, n, dlda):
 
 
 def dLda(lda):
-    """ Compute the 1st derivative of the function Lda(nu) with respect to lda.
-    """
+    """Compute the 1st derivative of the function Lda(nu) with respect to lda."""
     return 1.
 
 
 # Quadartic dependancy in lda
 def Lda2(k, n, dlda):
-    """ Compute the k-th derivative of  (lda(nu)**2) ie (lda(nu)**2)**(k) with respect to nu.
+    """Compute the k-th derivative of  (lda(nu)**2) ie (lda(nu)**2)**(k) with respect to nu.
 
     For multivariate case, the index `k` and `n` become tuple. In univaraite case,
     the implementation is based on symmetric Liebnitz-rule, see arxiv.org/abs/1909.11579 Eq. 38.
-    
+
     **If k==n, the terms containing lda^(n) are skipped**. They dont belong to the RHS computation
 
     Parameters
-    -----------
+    ----------
     k : int or tuple
         the requested derivative order of the flda term
     n : int or tuple
@@ -97,14 +96,14 @@ def Lda2(k, n, dlda):
         the value of the eigenvalue derivative
 
     Examples
-    ---------
+    --------
     Compute the derivatives of y(x)^2, with y = log(x) + 2 for x=2
     #                     0                   1                 2                   3                 4                   5
     >>> valid = np.array([7.253041736158007, 2.69314718055995, -0.846573590279973, 0.596573590279973, -0.644860385419959, 0.914720770839918])
     >>> dlda  = np.array([2.69314718055995, 0.50000000000000, -0.250000000000000, 0.250000000000000, -0.375000000000000, 0.750000000000000])
     >>> abs(Lda2(4, 5, dlda) - valid[4]) < 1e-12
     True
-    
+
     Test for multivariate formalism in Univariate case
     >>> abs(Lda2((4,), (5,), dlda)- valid[4]) < 1e-12
     True
@@ -151,7 +150,7 @@ def Lda2(k, n, dlda):
             d = dlda[0]**2
         # else compute ;-)
         else:
-            if k == n: start=1
+            if k == n: start = 1
             # init sum
             d = 0
             # upper bound
@@ -165,22 +164,22 @@ def Lda2(k, n, dlda):
 
 
 def dLda2(lda):
-    """ Compute the 1st derivative of the function Lda2 with respect to lda.
-    """
+    """Compute the 1st derivative of the function Lda2 with respect to lda."""
     return 2*lda
 
 
 # Cubic dependancy in lda
 def Lda3(k, n, dlda):
-    """ Compute the k-th derivative of  (lda(nu)**3) ie (lda(nu)**3)**(k) with respect to nu
-    using Faa Di Bruno method for composite function.
+    r"""Compute the k-th derivative of  (lda(nu)**3) ie (lda(nu)**3)**(k) with respect to nu.
+
+    Using Faa Di Bruno method for composite function.
 
     This approach is limited to scalar parameter nu.
 
     **If k==n, the terms containing lda^(n) are skipped**. They dont belong to the RHS computation
 
     Parameters
-    -----------
+    ----------
     k : int
         The requested derivative order of the flda term.
     n : int
@@ -190,7 +189,7 @@ def Lda3(k, n, dlda):
 
 
     Examples
-    ---------
+    --------
     Compute the derivatives of y(x)^3, with \( y = log(x) + 2\) for x=2
     #                     0                 1                  2                 3                  4                   5
     >>> valid = np.array([19.5335089022175, 10.8795626042370, -1.40006053127857, 0.130200145858610, 0.699560166632044, -2.36641091139403 ])
@@ -229,14 +228,14 @@ def Lda3(k, n, dlda):
 
 
 def dLda3(lda):
-    """ Compute the 1st derivative of the function Lda3 with respect to lda.
-    """
+    """Compute the 1st derivative of the function Lda3 with respect to lda."""
     return 3.*lda*lda
 
 
 # exp(-tau * lda)
 def ExpLda(k, n, dlda, tau=0.001j):
-    """ Compute the k-th derivative of  `exp(-tau*lda(nu))` with respect to nu
+    r"""Compute the k-th derivative of  `exp(-tau*lda(nu))` with respect to nu.
+
     using Faa Di Bruno method for composite function.
 
     This approach is limited to scalar parameter nu.
@@ -244,7 +243,7 @@ def ExpLda(k, n, dlda, tau=0.001j):
     **If k==n, the terms containing lda^(n) are skipped**. They dont belong to the RHS computation
 
     Parameters
-    -----------
+    ----------
     k : int
         The requested derivative order of the flda term.
     n : int
@@ -255,7 +254,7 @@ def ExpLda(k, n, dlda, tau=0.001j):
         A scaling factor.
 
     Examples
-    ---------
+    --------
     Compute the derivatives of exp(-tau*lda(nu)), with \( lda(nu) = nu + nu**2 + 2\) for x=2 and tau = 0.001
     #                     0                   1                    2                     3                    4
     >>> valid = np.array([0.992031914837061, -0.00496015957418530, -0.00195926303180320, 2.96369534557572e-5, 1.16073934235404e-5])
@@ -277,7 +276,7 @@ def ExpLda(k, n, dlda, tau=0.001j):
         d = np.exp(-tau*dlda[0])
     # else compute ;-)
     else:
-        # Create the 'outer' function derivatives        
+        # Create the 'outer' function derivatives
         f = np.exp(-tau*dlda[0])
         df = (-tau)**np.arange(0, len(dlda))*f
         # Append a 0 in dlda[n] to remove the term containing lda**(n) which is not known
@@ -294,9 +293,7 @@ def ExpLda(k, n, dlda, tau=0.001j):
 
 
 def dExpLda(lda):
-    """ Compute the 1st derivative of the function exp(-tau*lda) with respect
-    to lda.
-    """
+    """Compute the 1st derivative of the function exp(-tau*lda) with respect to lda."""
     # FIXME find a better way to do that...
     # trick to recover the defaut value of tau in ExpLda
     tau = ExpLda.__defaults__[0]
