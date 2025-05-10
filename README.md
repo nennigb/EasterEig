@@ -48,40 +48,47 @@ Install
 --------
 
 `eastereig` is based on numpy (full) and scipy (sparse) for most internal computation and can handle _large_ parallel sparse matrices thanks to **optional** import of [petsc4py (>=3.20)](https://petsc.org/release/petsc4py/install.html) (and mumps), 
-[slepc4py](https://slepc4py.readthedocs.io/en/stable/install.html) and
-and [mpi4py](https://mpi4py.readthedocs.io/en/stable/install.html). As non-hermitian problems involve complex-valued eigenvalues, computations are realized with complex arithmetic and the **complex petsc version** is expected.
-[sympy](https://docs.sympy.org) is used for formal manipulation of multivariate polynomials.
-Riemann surface can also be plotted using the `Loci` class either with `matplotlib` or with [`pyvista`](https://github.com/pyvista/pyvista) and and `pyvistaqt` (optional).
+[slepc4py](https://slepc4py.readthedocs.io/en/stable/install.html) 
+and [mpi4py](https://mpi4py.readthedocs.io/en/stable/install.html). As non-Hermitian problems involve complex-valued eigenvalues, computations are realized with complex arithmetic and the **complex petsc version** is expected.
+The [sympy](https://docs.sympy.org) package is used for formal manipulation of multivariate polynomials.
+Riemann surface can also be plotted using the `Loci` class either with `matplotlib` or with [`pyvista`](https://github.com/pyvista/pyvista) and [`pyvistaqt`](https://github.com/pyvista/pyvistaqt) (optional).
 
-Before installing `eastereig`, you'll need python (tested for v >= 3.8), and to install manually optional dependencies you need:
-* The python packages `pypolsys` (optional homotopy EP solver) available from https://github.com/nennigb/pypolsys
+Before installing `eastereig`, you'll need python (tested for v >= 3.8), `pip`, and to manually install the **optional** dependencies you want:
 * The python packages `pyvista` and `pyvistaqt` (optional Riemann surfaces plotting)
 * The python package `petsc4py` and `slepc4py` (optional sparse parallel matrices surpport)
-* A fortran compiler (optional, tested with gfortran)
-* Install `scikit-umfpack` to improve `scipy.sparse` LU factorization performance (optional)
+* A fortran compiler (only for building from the sources, tested with `gfortran` on linux and macos, with `m2w64-toolchain` on windows with conda or with `rtools` distribution of `mingw64`)
+* The python package `scikit-umfpack` to improve `scipy.sparse` LU factorization performance.
 
 **Other dependencies will be installed automatically**.
 
-By default, the fortan evaluation of multivariate polynomial is deactivated. To enable it, you need a fortran compiler and to set the environment variable: `EASTEREIG_USE_FPOLY=True`. On ubuntu like system, run
-```console
-export EASTEREIG_USE_FPOLY=True
-```
-Then, you can install `eastereig` either from pypi (main releases only):
+### From the wheel
+The easiest way to install `eastereig` is to use the wheel available on pypi. Wheels, with compiled extension, are available for the most usual 64 bits architectures and os (Linux, Windows, Macos). You can install `eastereig` from pip:
 ```console
 pip install eastereig [--user]
-``` 
-or from github (more updates):
-```console
-pip install path/to/EasterEig-version.tar.gz [--user]
 ```
-Note that on ubuntu, you will need to use `pip3` instead of `pip` and `python3` instead of `python`. Please see the steps given in the continous integration script [workflows](.github/workflows/ci-ubuntu.yml).
-We recommend installing `eastereig` in virtual environemment unless you know what you are doing.
+If wheels are not available, the pure python version will be installed. You can also use a virtual environnement for better isolation.
+
+### From the source
+If you need to modify the code or the last development version, you need to build `eastereig` from the source. The sources are available on pypi or on the github [repos](https://github.com/nennigb/EasterEig/).
+
+If the variable `use_fpoly=false`, the fortran extension is skipped. If `use_fpoly=true`, the fortran extension is enabled. The evaluations of the PCP will be faster but a fortran compiler is required.
+
+Once you manualy get the sources, in the `eastereig` source folder (where there is the `meson.build` file), run
+```console
+pip install -v . -Csetup-args=-Duse_fpoly=true
+```
+or,
+```console
+pip install -v --no-build-isolation --editable . -Csetup-args=-Duse_fpoly=true
+```
+to install it in editable mode. If `-Csetup-args=-Duse_fpoly=true` is omitted, the default behavior, defined is `meson.options` applied.
+
+If needed, please see the steps given in the continuous integration scripts [ci-ubuntu](.github/workflows/ci-ubuntu.yml).
+
 
 Running tests
 -------------
-Tests are handled with `doctest` and with `unittest`
-
-To execute the full test suite, run :
+Tests are handled with `doctest` and with `unittest`.  To execute the full test suite, run :
 ```console
 python -m eastereig
 ```
@@ -104,7 +111,7 @@ Several working examples are available in `./examples/` folder
   
   1. Acoustic waveguide with an impedance boundary condition (with the different supported linear libraries)
   2. 3-dof toy model of a structure with one random parameter (with numpy)
-  3. 3-dof toy with two parameters leading to EP3
+  3. 3-dof toy with two parameters, based on `CharPol` class and leading to EP3
   4. ...
 
 > **Remarks :**
@@ -126,7 +133,7 @@ K = [K0, K1, K2].
 ```python
 dK = [dK0, dK1, dK2].
 ```
-Finally, **the functions** that returns derivatives with respect to $\lambda$ are stored in 'flda'
+Finally, **the functions** that returns derivatives with respect to $\lambda$ are stored in $f_i(\lambda)$
 ```python
 flda = [None, ee.lda_func.Lda, ee.lda_func.Lda2].
 ```
