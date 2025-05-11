@@ -1,5 +1,5 @@
 project(
-    'eastereig',  #['c', 'fortran'],
+    'eastereig',
     version: run_command('eastereig/version.py', check: true).stdout().strip(),
     license: 'GNU General Public License v3 (GPLv3)',
     meson_version: '>=1.1.0',
@@ -10,10 +10,9 @@ project(
 # works with `meson.options` file
 use_fpoly = get_option('use_fpoly')
 
-# load meson python module
+# Load meson python module
 py_mod = import('python')
 py = py_mod.find_installation(pure: false)
-py_dep = py.dependency()
 
 if use_fpoly == true
     add_languages(['c', 'fortran'])
@@ -22,6 +21,9 @@ if use_fpoly == true
         'quadmath',
         required: false,
     )
+
+    # Get python dependency, need to be after langage definition
+    py_dep = py.dependency()
 
     # Get include from numpy and f2py
     # based on https://numpy.org/doc/stable/f2py/buildtools/meson.html
