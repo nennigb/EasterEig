@@ -42,7 +42,7 @@ References
 
    [2] M. Ghienne and B. Nennig. Beyond the limitations of perturbation methods for real random eigenvalue problems using Exceptional Points and analytic continuation. Journal of Sound and vibration, (2020). [[doi](https://doi.org/10.1016/j.jsv.2020.115398)]; [[open access](https://hal.archives-ouvertes.fr/hal-02536849)]
    
-   [3] B. Nennig, E. Perrey-Debain, Martin Ghienne. Localization of high order exceptional points : applications to acoustic waveguides. 16ème Congrès Français d’Acoustique, Apr 2022, Marseille, France.  [[open access](https://hal.science/hal-03838635v1/document)]
+   [3] B. Nennig, Martin Ghienne, E. Perrey-Debain. Fast recovery of parametric eigenvalues depending on several parameters and location of high order exceptional points. arXiv 2505.06141, (2025). [[open access](https://arxiv.org/abs/2505.06141)]
        
 Install 
 --------
