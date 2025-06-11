@@ -19,11 +19,22 @@
 """
 # Define CharPol class and auxilliary classes.
 
-This class implements the **partial characteristic polynomial**.
+This class implements the **Partial Characteristic Polynomial**.
+
+For eigenvalue problem which are analytic function of the parameter, the
+characteristic polynomial is also an analytic function of the parameter.
+However, the access to this polynomial is generally impossible because of its size.
+
+An practical alternative is to introduce the concept of a Partial Characteristic Polynomial (PCP)
+whose coefficients are regular functions in a large domain of the parameter space
+and from which a subset of selected eigenvalues can be straightforwardly recovered at a negligible cost.
+
 This polynomial is built from Vieta formulas and from the successive
 derivatives of a selected set of eigenvalues.
 [Vieta' formulas](https://en.wikipedia.org/wiki/Vieta%27s_formulas)
 
+For more information about theoretical aspects see https://arxiv.org/abs/2505.06141.
+Be careful, in the code, ordering of sequences may be different from the paper.
 """
 import numpy as np
 from numpy.linalg import norm
@@ -69,6 +80,7 @@ class _SequentialExecutor():
 
     Could work even if charpol involved petsc objects.
     """
+
     def __init__(self, *args,  **kargs):
         pass
 
@@ -86,36 +98,64 @@ class _SequentialExecutor():
 
 class CharPol():
     r"""
-    Numerical representation of the *partial* characteristic polynomial.
+    Provide a numerical representation of the Partial Characteristic Polynomial.
 
-    This polynomial is built from Vieta formulas and from the successive
-    derivatives of the selected set of eigenvalues \(\Lambda\).
+    This approach is suitable when more that two eigenvalue are close to coalesce or when
+    several parameters are involved. In the following, the number of parameter is N.
 
-    This class allows to reconstruct eigenvalue loci and to locate
-    EP between the eigenvalues from the set.
+    This class allows to :
+
+      1. Reconstruct eigenvalue loci
+      2. Locate EPs between the eigenvalues from the set.
+
+    Partial Characteristic Polynomialis is built from Vieta formulas and from the successive
+    derivatives of a selected set of L eigenvalues \(\Lambda\).
 
     This polynomial can be seen as a polynomial in \(\lambda\), whom coefficients \(a_n\\)
-    are Taylor series in \(\nu_0, ..., \nu_m \). For instance with 3 coefficients, the
-    attribut `dcoef[n]` represents the array \((a_n)_{i,j,k}\)
-    $$a_n(\nu_0, \nu_1, \nu_2) = \sum_{i,j,k} (a_n)_{i,j,k}  \nu_0^i  \nu_1^j  \nu_2^k$$
+    are Taylor series in \(\nu_0, ..., \nu_m \).
+
+    The PCP coefficients are thus expanded as follows
+
+    $$
+    \newcommand{\nuv}{\boldsymbol{\nu}}
+    \newcommand{\alphav}{\boldsymbol{\alpha}}
+    {a_k}(\nuv) \approx \mathcal{T}_{a_k}(\nuv) = \sum_{\alpha_1=0}^{D_1} \cdots
+    \sum_{\alpha_N=0}^{D_N} (\hat{a}_k)_{\alphav} \, (\nuv_0-\nuv)^{\alphav} \quad
+    \mathrm{where} \quad (\hat{a}_k)_{\alphav} = \frac{\partial^{\alphav}a_k(\nuv_0)}{\alphav!}.
+    $$
+
+    Here, we the multi-index notation $\alphav  = (\alpha_1, \dots, \alpha_N)$ and $D_i$ is the derivtive
+    order of the parameter $\nu_i$.
 
     The partial characteristic polynomial reads
-    $$ p = \sum \lambda^{n-1} a_{n-1}(\boldsymbol\nu)  + ... + a_0(\boldsymbol\nu)$$
+    $$p(\lambda, \boldsymbol \nu) = \sum_{k=0}^{L} a_k(\boldsymbol \nu) \lambda^{L-k}.$$
+    By construction, $a_0(\boldsymbol \nu)=1$ is associated to $\lambda^L$. These coefficients
+    are stored in descending order in the `dcoefs` attribut.
     """
 
     def __init__(self, dLambda, nu0=None, vieta=True):
-        """Initialize the object with a list of derivatives of the eigenvalue or
-        a list of Eig objects.
+        r"""Initialize with a list of eigenvalue derivatives or a list of `Eig` objects.
 
         Parameters
         ----------
         dLambda : list
-           List of the derivatives of the eigenvalues used to build this object
+            List of the derivatives of the eigenvalues used to build this object.
         nu0 : iterable
-            the value where the derivatives are computed
+            The value where the derivatives are computed.
         vieta : bool, optional, default True
             Compute or not the CharPol coefficients using Vieta formula.
             Setting `vieta = False` can be useful for alternative constructors.
+
+        Attributes
+        ----------
+        dLambda : list
+            List of the derivatives of the eigenvalues used to build this object
+        nu0 : iterable
+            The value where the derivatives are computed
+        dcoefs : iterable
+            The taylor coefficients $a_n(\boldsymbol \nuv)$ ordered in descending order.
+        N : int
+            The number of eigs used in the charpol object.
         """
         # Initial check on input are delegate
         self.dLambda, self.nu0 = self._initial_init_checks(dLambda, nu0)
@@ -165,14 +205,14 @@ class CharPol():
 
     @classmethod
     def _from_dcoefs(cls, dcoefs, dLambda, nu0):
-        """Define factory method to create CharPol from its polynomial coefficients.
+        """Create CharPol from its polynomial coefficients.
 
         Parameters
         ----------
         dcoefs : list
             List of the derivatives of each coef of the polynom. It is assumed that
             a_N=1. The coefficaients are sorted in decending order such,
-            1 lda**N + ... + a_0 lda**0
+            1 lda**N + ... + a_0 lda**0.
         dLambda : list
             List of the derivatives of the eigenvalues used to build this
             object.
@@ -191,18 +231,18 @@ class CharPol():
 
     @classmethod
     def from_recursive_mult(cls, dLambda, nu0=None, block_size=3):
-        """Define factory method to create recursively CharPol from the lambdas.
+        """Create recursively CharPol from the lambdas.
 
         The methods is based on _divide and conquer_ approach. It combines
         the Vieta's formulas and polynomial multiplications to speed up the
-        computation.
+        computation. **This is the prefered approach**.
 
         Parameters
         ----------
         dLambda : list
-           List of the derivatives of the eigenvalues used to build this object
+            List of the derivatives of the eigenvalues used to build this object
         nu0 : iterable
-            the value where the derivatives are computed
+            The value where the derivatives are computed
         block_size : int, optional, default 3
             The number of eigenvalue used in initial Vieta computation.
 
@@ -263,7 +303,7 @@ class CharPol():
         Parameters
         ----------
         filename : string
-            The full path to save the data.
+            The full path to load data from.
 
         Returns
         -------
@@ -455,7 +495,7 @@ class CharPol():
         return CharPol._from_dcoefs(dcoefs, dLambda, self.nu0)
 
     def trunc(self, param_truncation=-1):
-        """Return a copy of a truncated conjugate CharPol.
+        """Return a copy of a truncated CharPol.
 
         Parameters
         ----------
@@ -469,7 +509,7 @@ class CharPol():
 
         Remarks
         -------
-        This may be usefull to test sensitivity and convergence.
+        This is usefull to test sensitivity and convergence.
         """
         N = len(self.nu0)
         # Create slices accounting for truncation
@@ -515,7 +555,7 @@ class CharPol():
         return b
 
     def set_param(self, index, value):
-        """Return a new charpol with one of these parameters set to `value`.
+        """Return a new CharPol with one of its parameters set to `value`.
 
         The parameters remains in the same order but without the set parameter.
 
@@ -675,23 +715,19 @@ class CharPol():
 
         This system is built on the sucessive derivatives of the partial
         characteristic polynomial,
-
+        ```
         J = [[dp0/dlda, dp0/dnu_0 ...., dp0/dnu_n],
              [dp1/dlda, dp1/dnu_0 ...., dp1/dnu_n],
               .....]
-        where pi = d^ip0/dlda^i.
+        ```
+        where `i = d^ip0/dlda^i.`
 
-
-        Generically, this système yields to a finite set of EP.
-
-        Althought nu is relative to nu0, absolute value have to be used.
-
-        # TODO need to add a test (validated in toy_3doy_2params)
+        Generically, this system yields to a finite set of EP.
 
         Parameters
         ----------
         vals : iterable
-            Containts the value of (lda, nu_0, ..., nu_n) where the polynom
+            The value of the extended parameter (lda, nu_0, ..., nu_n) for which the polynom
             must be evaluated. Althought nu is relative to nu0, absolute value
             have to be used.
         trunc : int or None
@@ -776,7 +812,6 @@ class CharPol():
         -------
         The partial caracteristic polynomial at (lda, nu).
 
-        # TODO need to add a test (validated in toy_3doy_2params)
         """
         # Extract input value
         lda, *nu = vals
@@ -897,8 +932,8 @@ class CharPol():
 
         Based on scipy/MINPACK implementation of 'lm' through the scipy.optimize
         root function.
-        Since the algorithm work with real value problem. Real and imaginary are
-        splt.
+        Since the algorithm works with real value problem. Real and imaginary are
+        split.
 
         Parameters
         ----------
@@ -907,9 +942,10 @@ class CharPol():
         tol : float
             The tolerance to stop iteration.
         normalized : bool
-            If `True` the tol is applied to the ratio of the ||f(x)||/||f(x0)||
+            If `True` the tol is applied to the ratio of the ||f(x)||/||f(x0)||. Added
+            for compatibility but not used.
         verbose : bool
-            print iteration log.
+            Print iteration log.
 
         Returns
         -------
@@ -953,7 +989,7 @@ class CharPol():
                     Jr[eq_idr+1, ir+1] = Jc[eq_id, i].real
             return Fr, Jr
 
-        # see also hybr,s ometimes beter ?
+        # see also hybr, sometimes beter ?
         # scaling = np.ones_like(x)
         # scaling[6:] = imag_scaling
         # Check input
@@ -962,10 +998,10 @@ class CharPol():
         else:
             z0 = np.array(z0).ravel()
         x = to_x(z0)
-        scaling = 1. #/ np.abs(x)
+        # scaling = 1. # / np.abs(x)
         sol = spo.root(f_and_jac, x, method='lm', jac=True, callback=None,
-                       options={'maxiter': niter_max, 'ftol': tol, 'xtol': tol}) #'diag': scaling
-                            # })  #{}'xtol': 0.00000001,
+                       options={'maxiter': niter_max, 'ftol': tol, 'xtol': tol})  # 'diag': scaling
+        # })  #{}'xtol': 0.00000001,
         if verbose:
             print(sol)
 
@@ -980,7 +1016,15 @@ class CharPol():
         return z
 
     def newton_from_sol(self, x, **kargs):
-        """Find EP with Newton-Raphson solver from single starting point."""
+        """Find EP with Newton-Raphson solver from single starting point.
+
+        See `iterative_solve` method for `kargs` description.
+
+        Parameters
+        ----------
+        x : array
+            The initial guess of size N.
+        """
         return self._newton(self.EP_system, self.jacobian, x, **kargs)
 
     def newton(self, *args, **kargs):
@@ -1005,11 +1049,12 @@ class CharPol():
             The number of decimals keep to filter the solution (using np.unique).
             Note it should be concistant with `tol` (~|log10(tol)|).
         max_workers : int
-            The number of worker to explore the parametric space.
+            The number of workers to explore the parametric space.
         tol : float
             The tolerance to stop iteration. See solver details for deeper insight.
         normalized : bool
-            If `True` the tol is applied to the ratio of the ||f(x)||/||f(x0)||
+            If `True` the tol is applied to the ratio of the ||f(x)||/||f(x0)|| in
+            `nr` solver.
         verbose : bool
             print iteration log.
         algorithm : string
@@ -1029,7 +1074,7 @@ class CharPol():
         For parallel execution, consider using (before numpy import)
         ```python
         import os
-        os.environ["OMP_NUM_THREADS"] = "1"
+        os.environ["OMP_NUM_THREADS"] = "1" # or MKL_NUM_THREADS on windows
         ```
         """
         if len(bounds) != len(self.nu0) + 1:
@@ -1061,16 +1106,16 @@ class CharPol():
 
         if algorithm == 'nr':
             # use partial to fixed all function parameters except lda
-            _p_newton = partial(self._newton, self.EP_system, self.jacobian, tol=tol,
-                                verbose=verbose)
+            _p_solver = partial(self._newton, self.EP_system, self.jacobian, tol=tol,
+                                verbose=verbose, normalized=normalized)
         elif algorithm == 'lm':
-            _p_newton = partial(self.lm_from_sol, tol=tol, verbose=verbose)
+            _p_solver = partial(self.lm_from_sol, tol=tol, verbose=verbose)
         else:
             raise NotImplementedError('The request algorithm `{}` is not recognized.'.format(algorithm))
         total = np.prod([len(g) for g in grid])
         pbar = tqdm.tqdm(total=total, position=0, leave=True)
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            for s in executor.map(_p_newton,
+            for s in executor.map(_p_solver,
                                   it.product(*grid),
                                   chunksize=chunksize):
                 all_sol.append(s)
@@ -1089,16 +1134,21 @@ class CharPol():
                        dense=True, bplp_max=2000, oo_tol=1e-5, only_bezout=False, tol_filter=-1):
         """Solve EP system by homotopy method.
 
-        Require `pypolsys` python package.
+
         This method defines a simplified interface to `pypolsys` homotopy
-        solver. Such solver allow to find *all solutions* of the polynomial
-        systems. An upper bound of the number of solution is given by
+        solver.
+        Such solver allows to find **all solutions** of the polynomial
+        systems.
+
+        An upper bound of the number of solution is given by
         the Bezout number, equal to the product of the degrees each polynomials.
-        This number may be huge.
-        Here, we use a m-homogeneous variable partition to limit the number of
-        spurious solutions 'at infinty' to track. The number of paths is given
-        by `bplp` and can be obtained without performing the tracking by setting
+        This number may be huge. The number of paths is given
+        by `bplp` and can be quickly obtained without performing the tracking by setting
         `only_bezout=True`.
+
+        Here, we use a m-homogeneous variable partition to limit the number of
+        spurious solutions 'at infinty' to track.
+
         This method is interesting because all solutions are found, whereas
         for iterative methods like Newton-Raphson or Levenberg-Marquard.
 
@@ -1108,20 +1158,20 @@ class CharPol():
             The maximum degree to keep for each variable. Default is `None` and all
             terms are kept.
         tracktol : float, optional
-            is the local error tolerance allowed the path tracker along
+            Is the local error tolerance allowed the path tracker along
             the path.
         finaltol : float, optional
-            is the accuracy desired for the final solution.  It is used
+            Is the accuracy desired for the final solution.  It is used
             for both the absolute and relative errors in a mixed error criterion.
         singtol : float, optional
-            is the singularity test threshold used by SINGSYS_PLP.  If
+            Is the singularity test threshold used by SINGSYS_PLP.  If
             SINGTOL <= 0.0 on input, then SINGTOL is reset to a default value.
         dense : bool, optional
             If `True`, evaluate the polynomial using the fastermultivariate Horner
             scheme, optimized for dense polynomial. Else, monomial evaluation
             are used.
         bplp_max : int, optional
-            Provides an upper bounds to run homotopy solving.
+            Provides an upper bound to run homotopy solving.
             If `bplp > bplp_max`, the computation is aborted.
         oo_tol : float, optional
             Tolerance to drop out solution at infinity. If `oo_tol=0`, all
@@ -1142,6 +1192,10 @@ class CharPol():
             `r` is `None` if the computation has been aborted. If `oo_tol>0`,
             the number of rows may be less than `bplp`.
             If `bplp > bplp_max`, `r` is None.
+
+        Remarks
+        -------
+        Requires `pypolsys` python package.
         """
         try:
             import pypolsys
@@ -1193,22 +1247,34 @@ class CharPol():
 
     def filter_spurious_solution(self, sol, trunc=-1, filter=True, tol=1e-2,
                                  plot=False, sort=True):
-        """Remove spurious solution based on roots sensitivty estimation.
+        r"""Remove spurious solutions based on roots sensitivty estimation.
+
+        The multivariate polynomial system leading to EPs can be recast into
+        $$ \mathbf{S}(\mathbf{s}^*) = \mathbf{0}.$$
+
+        The sensitivity indicator which corresponds to a single NR correction step starting from
+        the solution $\mathbf{s}$ obtained using the maximum order of derivation $D$ in the
+        Taylor expansion
+        $$
+            \delta = \Vert\mathbf{J}^{-1} \mathbf{S}(\mathbf{s})\Vert_2,
+        $$
+        where the Jacobian matrix $\mathbf{J}$ of the multivariate system are both computed
+        using $D-1$ derivatives in the expansion.
 
         Parameters
         ----------
         sol : array
             Contains all the found EP candidates solutions along its rows.
-        trunc : int
+        trunc : int, optional
             The truncation to apply in each parameter wtr the maximum available
             order of the Taylor expansion. The integer is supposed
             to be negative as in `an[:trunc, :trunc, ..., :trunc]`.
         filter : bool, optional
             If `True`, only true solution are filter.
-        tol : float
+        tol : float, optional
             The tolerance used in the filtering. sol such kappa(sol) > tol are
             removed.
-        plot: bool
+        plot: bool, optional
             Plot the sensitivity distribution.
         sort: bool, optional
             If True, sort the filtered solution with ascending sensitivity
@@ -1320,9 +1386,10 @@ class CharPol():
         return P, variables
 
     def getdH(self):
-        r"""Compute the Taylor series of H function with respect to nu.
+        r"""Compute the Taylor series of the partial discriminant H with respect to nu.
 
-        H is proportional to the discriminant of the partial characteristic polynomial.
+        H is proportional to the discriminant of the partial characteristic polynomial
+        and vanishes for multiple roots like EPs.
 
         This method provides Taylor series of Discriminant, whereas the `discriminant`
         method, using the Sylvester matrix, just provides an evaluation at fixed
@@ -1330,30 +1397,30 @@ class CharPol():
         This Taylor series may be particularly usefull when dealing with univariate
         polynomial to find all the roots.
 
-        This _discriminant_ estimation is obtained from the eigenvalues (roots of the CharPol),
+        This _discriminant_ estimation is obtained from the eigenvalues used in the PCP,
         $$
-        H(\nu) = \prod_{i<j} (\lambda_i(\nu)-\lambda_j(\nu))^2.
+        \newcommand{\nuv}{\boldsymbol{\nu}}
+        \mathcal{H}(\nuv) = \prod_{1\le i<j\le L} (\lambda_i(\nuv)-\lambda_j(\nuv))^2
         $$
+        for all \(\lambda_i \in \Lambda\),
         this expression can be obtained, seeing that
         $$
-        H(\nu) = \prod_{p \in P} h_{p}(\nu)
+        H(\nu) = \prod_{p \in P} h_{p}(\nu),
         $$
+        where \(h_{p}(\nu)=(\lambda_i(\nu)-\lambda_j(\nu))^2\) for \(i\neq j \).
         Here, we called \(P\) the set of all possible pair of eigenvalues from the set of the
         selected eigenvalue \(\Lambda\).
 
         Returns
         -------
-        TH : list
-            Contains the Taylor series of H.
+        TH : Discr
+            Object that contains the Taylor series of H.
 
         Remarks
         -------
-        H is equal to the discriminant iff an=1, else need to multiply by an**(2*n -2).
-
-        # TODO add tests!
+        H is equal to the discriminant iff `an=1`, else you need to multiply by `an**(2*n -2)`.
         """
-        # TODO could it be adapted for multi parameter ?
-        # it will allow to elimitate on variable and continue to use homotopy
+        # It will allow to elimitate on variable and continue to use homotopy
         dLambda = self.dLambda
 
         # assume all dLambda have the same shape
@@ -1587,7 +1654,7 @@ class CharPol():
             A dictionnary containing the statistics of the radius of convergence for
             all coefficients and along all directions.
             The primary keys are the parameter integer index and the condidary
-            keys are the `mean` and the `std` obtained for all polynomial coefficients.
+            keys are the `mean`, `min` and the `std` obtained for all polynomial coefficients.
         """
         R = {}
         dcoef_r = np.zeros((self.dcoefs[0].ndim, len(self.dcoefs)-1))
@@ -1654,14 +1721,15 @@ class Discr(Taylor):
 
     def locate(self, plot=False):
         """Find EP locations for univariate case only.
+
         Parameters
         ----------
         plot: bool
             If true, plot the roots of the discriminant compare to truncated version
             to identify the spurious roots.
 
-        Return
-        ------
+        Returns
+        -------
         r: array
             The roots represent all EP2 candodates sorted with descending sensitivity.
             The roots are express in an absolute way, ie nu0 is already included.
