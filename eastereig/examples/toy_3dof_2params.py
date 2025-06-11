@@ -161,6 +161,27 @@ def _inner(l, N, var, nu, mu):
     return dlda
 
 
+def sympy_check_poly():
+    """Compute the true characteristic polynomial with sympy."""
+    # FIXME hard coded parameters
+    m = 1.
+    k = 1.
+    mu, nu, lda = sym.symbols('mu, nu, lambda', complex=True)
+
+    M = - sym.Matrix([[m, 0, 0],
+                      [0, m, 0],
+                      [0, 0, m]])
+    K = sym.Matrix([[mu+k, -k, 0.],
+                    [-k, 2*k, -k],
+                    [0., -k, nu+k]])
+    # Symbols
+    p0 = sym.det(K + lda*M)
+    # Ensure the polynomial has the good sign
+    a3 = p0.coeff(lda, 3)
+    p0 = p0 / a3
+    return p0, mu, nu, lda
+
+
 def sympy_check(nu0, sympyfile=None):
     """Check multiple derivatives with sympy.
 
@@ -181,20 +202,9 @@ def sympy_check(nu0, sympyfile=None):
     # set max // workers
     max_workers = 3
     # derivatives order
-    N = (1, 1)
-    # FIXME hard coded parameters
-    m = 1.
-    k = 1.
-    mu, nu, lda = sym.symbols('mu, nu, lambda', complex=True)
+    N = (2, 2)
+    p0, mu, nu, lda = sympy_check_poly()
     var = {mu: nu0[0], nu: nu0[1]}
-    M = - sym.Matrix([[m, 0, 0],
-                      [0, m, 0],
-                      [0, 0, m]])
-    K = sym.Matrix([[mu+k, -k, 0.],
-                    [-k, 2*k, -k],
-                    [0., -k, nu+k]])
-    # Symbols
-    p0 = sym.det(K + lda*M)
     p1 = sym.diff(p0, lda)
     p2 = sym.diff(p1, lda)
 
@@ -218,7 +228,33 @@ def sympy_check(nu0, sympyfile=None):
             dlda[i] = dlda_
     if sympyfile:
         np.savez(sympyfile, dlda=dlda)
-    return dlda, EP_sym, g
+    return dlda, EP_sym, g, p0
+
+
+def sympy_jac_check(p0, s):
+    """Check the Jacobian matrix computation.
+
+    Parameters
+    ----------
+    p0: sympy expression
+        The true characteristic polynomial.
+    s : iterable
+        Absolute values of the extened paramters (lda, nu).
+    """
+    gens = tuple(p0.free_symbols)
+    gens = sorted(gens, key=lambda x: x.name, reverse=False)
+    lda, _, _ = gens
+    N = len(s)
+    s = np.array(s, dtype=complex)
+    # s[1::] = s[1::] - np.array(nu0, dtype=complex)
+    P = [p0.diff((lda, i)) for i in range(0, N)]
+    J = np.zeros((N, N), dtype=complex)
+    v = np.zeros((N,), dtype=complex)
+    for row in range(0, N):
+        v[row] = complex(P[row].subs(dict(zip(gens, s))))
+        for col in range(0, N):
+            J[row, col] = complex(sym.diff(P[row], gens[col]).subs(dict(zip(gens, s))))
+    return J, v
 
 
 sol_ana = np.array([[2. - 1.77635684e-15j, 1. + 1.41421356e+00j, 1. - 1.41421356e+00j],
@@ -227,6 +263,15 @@ sol_ana = np.array([[2. - 1.77635684e-15j, 1. + 1.41421356e+00j, 1. - 1.41421356
                     [2. + 1.73205081e+00j, 0.5+2.59807621e+00j, 1.5+2.59807621e+00j],
                     [2. - 1.73205081e+00j, 1.5-2.59807621e+00j, 0.5-2.59807621e+00j],
                     [2. + 1.73205081e+00j, 1.5+2.59807621e+00j, 0.5+2.59807621e+00j]])
+
+
+# Ref jacobian matrix obtained from sympy_jac_check with s = (1.5, 1., 2.)
+Jana = np.array([[-0.25+0.j,  0.25+0.j,  0.75+0.j],
+                 [-5. + 0.j,  2. + 0.j,  1. + 0.j],
+                 [6. + 0.j, -2. + 0.j, -2. + 0.j]])
+
+# Ref Ep system obtained from sympy_jac_check with s = (1.5, 1., 2.)
+vana = np.array([1.625+0.j, - 0.25 + 0.j, - 5. + 0.j])
 
 
 def error_between(sol1, sol2):
@@ -297,3 +342,8 @@ if __name__ == '__main__':
     print('Found EP3:')
     print(sol)
     print('Error between found EP and analytic solution: ', error)
+    # How to generate numercal value from sympy computation
+    # dlda, EP_sym, g, p0 = sympy_check(C.nu0, sympyfile=None)
+    # s = (1.5, 1., 2.)
+    # Jana, vana = sympy_jac_check(p0, s)
+    # Jpcp = C.jacobian(s)
