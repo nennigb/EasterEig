@@ -25,11 +25,14 @@ import eastereig as ee
 import time
 import tempfile
 from os import path
+import sympy as sym
 from eastereig.examples.WGadmitance_numpy_mv import Ynumpy, nu_ref
 from eastereig.examples.WGimpedance_numpy import Znumpy, z_ref
+from eastereig.examples.toy_3dof_2params import Network, Jana, vana, sympy_check_poly
 from scipy.spatial import distance_matrix
 from scipy.optimize import linear_sum_assignment
 from importlib.util import find_spec as _find_spec
+from tempfile import TemporaryDirectory
 
 class Test_charpol_mult(unittest.TestCase):
     """Define multivariate charpol test cases.
@@ -256,6 +259,72 @@ class Test_charpol_uni(unittest.TestCase):
         r, s = dh.locate()
         self.assertTrue(np.allclose(r[0], np.array(z_ref[0])))
 
+class Test_charpol_basics(unittest.TestCase):
+    """Define charpol basic function test cases.
+    """
+    @classmethod
+    def setUpClass(cls):
+        print('\n> Tests of ', cls.__name__)
+
+    def setUp(self):
+        # Define the order of derivation for each parameter
+        Nderiv = (5, 5)
+        # Define the inital value of parameter
+        nu0 = np.array([0.95590969 - 1.48135044j + 0.15 + 0.1j,
+                        1. + 1.41421356e+00j + 0.1 + 0.1j])
+        # Instiate the problem
+        net = Network(nu0)
+        net.createSolver(pb_type='gen')
+        # Run the eigenvalue computation
+        Lambda = net.solver.solve(target=0+0j)
+        # Create a list of the eigenvalue to monitor
+        lda_list = np.arange(0, 3)
+        # Return the eigenvalue and eigenvector in a list of Eig object
+        extracted = net.solver.extract(lda_list)
+        # destroy solver (important for petsc/slepc)
+        net.solver.destroy()
+        # Compute the eigenvalue derivatives
+        for vp in extracted:
+            vp.getDerivativesMV(Nderiv, net)
+        # Find EP with Charpol
+        C = ee.CharPol(extracted)
+        # Store them
+        self.C = C
+        self.s = (1.5, 1., 2.)
+
+    def test_charpol_jacobian(self):
+        """Test jacobian matrix wtr to sympy.
+        """
+        # Locate EP using Charpol
+        Jpcp = self.C.jacobian(self.s)
+        # Check if charpol find the EP
+        self.assertTrue(np.allclose(Jpcp, Jana, rtol=1e-6))
+
+    def test_charpol_discrimant(self):
+        """Test discriminant computation wtr to sympy.
+        """
+        s = self.s
+        # Use Sylvester matrix
+        d_pcp_syl = self.C.discriminant(s[1::])
+        p0, mu, nu, lda = sympy_check_poly()
+        p = sym.Poly(p0, lda)
+        d_ana = p.discriminant().subs({mu: s[1], nu: s[2]})
+        # Use Taylor expansion
+        H = self.C.getdH()
+        d_dH = H.eval_at(s[1::])
+        # Check results
+        self.assertTrue(abs(d_ana-d_pcp_syl) < 1e-5)
+        self.assertTrue(abs(d_ana-d_dH) < 1e-5)
+
+    def test_charpol_load_export(self):
+        """Test discriminant export and load.
+        """
+        temp_dir = TemporaryDirectory()
+        self.C.export(path.join(temp_dir.name, 'pcp'))
+        D = ee.CharPol.load(path.join(temp_dir.name, 'pcp'))
+        self.assertTrue(np.allclose(self.C.EP_system(self.s),
+                                    D.EP_system(self.s), rtol=1e-6))
+        temp_dir.cleanup()
 
 if __name__ == '__main__':
     # run unittest test suite
