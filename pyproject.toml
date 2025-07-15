@@ -35,3 +35,14 @@ classifiers = [
 [project.urls]
 homepage = "https://github.com/nennigb/EasterEig"
 
+[tool.pylint]
+max-line-length = 115
+disable = [
+    "C0302", # (too-many-lines)
+    "C0103", # (invalid-name) For fidelity to math notation!
+    "R0913", # (too-many-arguments)
+    "R0914", # (too-many-locals)    
+    "E0611", # (no-name-in-module)
+    "E1101", # (no-member) Often fail with petsc4py and numpy
+]
+
