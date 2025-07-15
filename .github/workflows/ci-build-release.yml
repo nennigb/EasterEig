@@ -41,9 +41,9 @@ jobs:
              MACOSX_DEPLOYMENT_TARGET=${{ matrix.os == 'macos-14' && '14.0' || '13.0' }}
           # CIBW_ENVIRONMENT: "MACOSX_DEPLOYMENT_TARGET=13.0"          
           CIBW_ENVIRONMENT_WINDOWS: CC=gcc CXX=g++ FC=gfortran
-          # CIBW_BEFORE_TEST: pip install pytest
-          # CIBW_TEST_COMMAND: "pytest --pyargs eastereig -v"
-          CIBW_TEST_COMMAND: "python eastereig/__main__.py"
+#          CIBW_BEFORE_TEST: pip install pytest
+#          CIBW_TEST_COMMAND: "pytest --pyargs eastereig -v"
+          CIBW_TEST_COMMAND: "python -m eastereig.__main__"
 
       - uses: actions/upload-artifact@main
         with:
@@ -144,4 +144,5 @@ jobs:
 #        --repo '${{ github.repository }}'
 #        --generate-notes
 #        --title 'eastereig ${{ github.ref_name }}'                   
+
 
