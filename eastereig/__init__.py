@@ -73,7 +73,8 @@ _CONST = _np.array([4.715922776012983e+257+2.3562408023262842e+251j,
 # Import class
 from .options import gopts
 from .eig import Eig
-from .op import OP
+from .op import OP, OPmv
 from .ep import EP
 from .loci import Loci
+from .charpol import CharPol
 from . import lda_func

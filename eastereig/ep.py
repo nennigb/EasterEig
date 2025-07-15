@@ -14,7 +14,7 @@
 r"""
 ##Define the EP class
 
-Assuming that the associated eigenvalue $\lambda^*$ is of algebraical multiplicity 2,
+Assuming that the associated eigenvalue \(\lambda^*\) is of algebraical multiplicity 2,
 the behavior of the two branches of solutions in the vicinity of \(\nu^*\) is
 given by a convergent **Puiseux series** [Kato:1980]
 $$
@@ -180,10 +180,10 @@ class EP:
 
     @staticmethod
     def Pmatrix(z0, N):
-        r"""Compute the matrix P defined by equating each power of \nu of the
-        Puiseux and Taylor expansions of the function g(\nu).
+        r"""Compute the matrix P defined by equating each power of \(\nu\) of the
+        Puiseux and Taylor expansions of the function \(g(\nu)\).
 
-        arxiv.org/abs/1909.11579 Eq. 13
+        arxiv.org/abs/1909.11579 Eq. 13.
 
         Parameters
         ----------
@@ -215,7 +215,7 @@ class EP:
         r""" Compute odd terms of the Puiseux expansion using iterative solver
         of the Non-Linear system
 
-        arxiv.org/abs/1909.11579 Eq. 15-16
+        arxiv.org/abs/1909.11579 Eq. 15-16.
 
         Description
         -----------
@@ -334,17 +334,16 @@ class EP:
         return roots
 
     def locate(self, tol=1e-2, xi=0.95, tronc=0):
-        r"""Compute the roots \( \\zeta_n \) of \( T_h^{N} \) the taylor expansion of h of order N.
+        r"""Compute the roots \(\zeta_n\) of \(T_h^{N}\) the taylor expansion of h of order N.
 
         The Exceptional Point (EP) is/are one of these roots.
 
-        Others roots which do not correspond to the EP are regularly arranged. They mostly seems to be
-        localized on a circle of radius R
+        Others roots which do not correspond to the EP are regularly arranged. 
+        They mostly seems to be localized on a circle of radius R.
 
         The algorithm to identified the EP is:
-
-          1. Compare the roots with \( T_h^{N-1} \)
-          2. Check if they belong to the mean radius circle \( \\vert \zeta_n \\vert < \\xi R \)
+          1. Compare the roots with \(T_h^{N-1}\)
+          2. Check if they belong to the mean radius circle \(\vert \zeta_n \vert < \xi R\).
 
         Parameters
         ----------
@@ -405,8 +404,8 @@ class EP:
         To limit the condition number of \(\mathbf{P}(\nu^*)\) when \(\vert \nu^*\vert \gg 1\),
         in Eq. (11) of [arxiv:1909.11579],
         it is preferable to make the change of variable \( \nu'=\nu-\nu^* \).
-        This yields to $$ 2 \mathbf{a}_e = \mathbf{P}(\nu_0-\nu^*) \mathbf{b} $$, this expression avoids
-        to inverse \(\mathbf{P}(\nu^*)\).
+        This yields to $$ 2 \mathbf{a}_e = \mathbf{P}(\nu_0-\nu^*) \mathbf{b},$$ 
+        this expression avoids to inverse \(\mathbf{P}(\nu^*)\).
         """
         # init and check
         try:

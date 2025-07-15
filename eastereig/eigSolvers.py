@@ -25,11 +25,11 @@ Examples
 The basic use of this class is
 
 1. Create the solver object :
- `myOP.createSolver(lib='numpy',pb_type='gen')`
+ `myOP.createSolver(lib='numpy', pb_type='gen')`
 2. Solve :
- `myOP.solver.solve(nev=6,target=0+0j,skipsym=False)`
+ `myOP.solver.solve(nev=6, target=0+0j, skipsym=False)`
 3. Get back the eigenvalue and eigenvector in a list of Eig object :
- `extracted = myOP.solver.extract( [0,1] )`
+ `extracted = myOP.solver.extract([0, 1])`
 4. Destroy solver (usefull for petsc/slepc) :
  `myOP.solver.destroy()`
 
@@ -144,8 +144,6 @@ class NumpyEigSolver(EigSolver):
     """Define the concrete interface common to all numpy Eigenvalue solver.
 
     The eigenvalue problem is solved with numpy for full matrix
-
-    # TODO add PEP by linearization
     """
 
     # keep trace of the lib
@@ -170,6 +168,7 @@ class NumpyEigSolver(EigSolver):
         """
         print('> Solve {} eigenvalue problem with {} class...\n'.format(self.pb_type,
                                                                         self.__class__.__name__))
+        # FIXME need to modify order based on lambda func
         if self.pb_type == 'std':
             self.Lda, Vec = sp.linalg.eig(self.K[0], b=None)
         elif self.pb_type == 'gen':
@@ -179,7 +178,7 @@ class NumpyEigSolver(EigSolver):
         else:
             raise NotImplementedError('The pb_type {} is not yet implemented'.format(self.pb_type))
 
-        # sort eigenvectors and create idx index
+        # Sort eigenvectors and create idx index
         self.sort(skipsym=skipsym)
         self.Vec = Vec[:, self.idx]
         return self.Lda
@@ -188,13 +187,14 @@ class NumpyEigSolver(EigSolver):
     def _pep(K):
         """Polynomial eigenvalue solver by linearisation with numpy.
 
-        1st basic version limited to quadratic eigenvalue problem.
-        #TODO Need to compare with F. Tisseur polyeig.
+        The linearization is performed with the first companion form (as in slepc).
+        Because of the monomial form, it is recommended to not exceed a degree of 5.
+        For higher degree, using orthogonal polynomial basis is recommanded.
 
         Parameters
         ----------
         K : List
-            list of matrix. the order is (K[0] + K[1]*lda + K[2]*lda**2)x=0
+            list of matrix. The order is (K[0] + K[1]*lda + K[2]*lda**2)x=0
 
         Examples
         --------
@@ -215,16 +215,37 @@ class NumpyEigSolver(EigSolver):
         """
         shape = K[0].shape
         dtype = K[0].dtype
-        # create auxiliary matrix
+        degree = len(K) - 1
+        degree1 = degree - 1
+        # Create auxiliary matrix
         I = np.eye(*shape, dtype=dtype)
         Z = np.zeros(shape, dtype=dtype)
+        # Create companion matrix
+        Comp = np.empty((degree, degree), dtype=object)
+        for (i, j), _ in np.ndenumerate(Comp):
+            if i == degree1:
+                # last list line with K
+                Comp[i, j] = -K[j]
+            elif j == i + 1:
+                # fill 1-st diag
+                Comp[i, j] = I
+            else:
+                # zeros elsewhere
+                Comp[i, j] = Z
 
-        A = np.bmat([[Z, I],
-                     [-K[0], -K[1]]
-                     ])
-        B = np.bmat([[I, Z],
-                     [Z, K[2]]
-                     ])
+        # Fill with I on the main diagonal excepted last term
+        Diag = np.empty((degree, degree), dtype=object)
+        for (i, j), _ in np.ndenumerate(Diag):
+            if (i == j) and (i < degree1):
+                Diag[i, j] = I
+            elif (i == j) and (i == degree1):
+                Diag[i, j] = K[j+1]
+            else:
+                # zeros elsewhere
+                Diag[i, j] = Z
+
+        A = np.bmat(Comp.tolist())
+        B = np.bmat(Diag.tolist())
         # solved linearised QEP
         D, V = sp.linalg.eig(A, B)
         # the (2*N,) eigenvector are normalized to 1.
@@ -262,13 +283,14 @@ class ScipySpEigSolver(EigSolver):
         if self.pb_type == 'std':
             self.Lda, Vec = eigs(self.K[0], k=nev, M=None, sigma=target, return_eigenvectors=True)
         elif self.pb_type == 'gen':
-            self.Lda, Vec = eigs(self.K[0], k=nev, M=-self.K[1], sigma=target, return_eigenvectors=True)
+            self.Lda, Vec = eigs(self.K[0], k=nev, M=-self.K[1],
+                                 sigma=target, return_eigenvectors=True)
         elif self.pb_type == 'PEP':
             self.Lda, Vec = self._pep(self.K, k=nev, sigma=target)
         else:
             raise NotImplementedError('The pb_type {} is not yet implemented'.format(self.pb_type))
 
-        # sort eigenvectors and create idx index
+        # Sort eigenvectors and create idx index
         self.sort(skipsym=skipsym)
         self.Vec = Vec[:, self.idx]
         return self.Lda
@@ -277,7 +299,9 @@ class ScipySpEigSolver(EigSolver):
     def _pep(K, k=4, sigma=0.):
         """Polynomial eigenvalue solver by linearisation with scipy sparse.
 
-        1st basic version limited to quadratic eigenvalue problem.
+        The linearization is performed with the first companion form (as in slepc).
+        Because of the monomial form, it is recommended to not exceed a degree of 5.
+        For higher degree, using orthogonal polynomial basis is recommanded.
 
         Parameters
         ----------
@@ -307,16 +331,34 @@ class ScipySpEigSolver(EigSolver):
         """
         shape = K[0].shape
         dtype = K[0].dtype
+        degree = len(K) - 1
+        degree1 = degree - 1
         # create auxiliary matrix
         I = sp.sparse.eye(*shape, dtype=dtype).tocsc()
         Z = None
+
+        # Create companion matrix with 'None'
+        Comp = np.empty((degree, degree), dtype=object)
+        for (i, j), _ in np.ndenumerate(Comp):
+            if i == degree1:
+                # last list line with K
+                Comp[i, j] = -K[j]
+            elif j == i + 1:
+                # fill 1-st diag
+                Comp[i, j] = I
+
+        # Fill with I on the main diagonal excepted last term
+        Diag = np.empty((degree, degree), dtype=object)
+        for (i, j), _ in np.ndenumerate(Diag):
+            if (i == j) and (i < degree1):
+                Diag[i, j] = I
+            elif (i == j) and (i == degree1):
+                Diag[i, j] = K[j+1]
+
         # FIXME see the impact of .tocsc
-        A = sp.sparse.bmat([[Z, I],
-                            [-K[0], -K[1]]
-                            ], dtype=dtype).tocsc()
-        B = sp.sparse.bmat([[I, Z],
-                            [Z, K[2]]
-                            ], dtype=dtype).tocsc()
+        A = sp.sparse.bmat(Comp.tolist()).tocsc()
+        B = sp.sparse.bmat(Diag.tolist()).tocsc()
+
         # solved linearised QEP
         D, V = eigs(A, k=k, M=B, sigma=sigma, return_eigenvectors=True)
         # the (2*N,) eigenvector are normalized to 1.
@@ -462,8 +504,8 @@ if _petscHere:
             It is still possible to interact with the SLEPc solver until the destroy method call
             """
             self._create(nev, target)
-            Print('> Solve eigenvalue {} problem with {} class ...\n'.format(
-                self.pb_type, self.__class__.__name__))
+            Print('> Solve eigenvalue {} problem with {} class ...\n'.format(self.pb_type,
+                                                                             self.__class__.__name__))
             self.E.solve()
 
             nconv = self.E.getConverged()

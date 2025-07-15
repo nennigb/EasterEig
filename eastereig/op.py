@@ -45,7 +45,7 @@ call by `Eig` class objects.
 from . import eigSolvers
 from .adapter import adaptVec, adaptMat  # adapter patern to avoid interface missmatch
 from . import lda_func
-from .utils import multinomial_index_coefficients
+from .utils import multinomial_index_coefficients, multinomial_multiindex_coefficients
 from eastereig import _petscHere
 from abc import ABC, abstractmethod
 
@@ -61,10 +61,11 @@ else:
 
 
 # Abstract class, not instanciable
-# TODO add a check function before solver
 class OP(ABC):
     """
-    The OP class define the operator of the problem. This is an abstract class
+    The OP class define the operator of the problem.
+
+    This is an abstract class
     and you need to subclass it to describe your own problem.
 
     The following attribute **must** be defined in your subclass (see the examples)
@@ -77,7 +78,6 @@ class OP(ABC):
         A list of function to compute the derivative % nu of each matrix of K
     fdla: list
         A list of function that give the dependancy % lda
-
     """
 
     SOLVER_DICT = _SOLVER_DICT
@@ -85,20 +85,14 @@ class OP(ABC):
     """
 
     def __init__(self):
-        """
-        init method
-        """
+        """Init method."""
 
     def setnu0(self, nu0):
-        """
-        Set the nominal value of the parameter [mandatory]
-        """
+        """Set the nominal value of the parameter [mandatory]."""
         self.nu0 = nu0
 
-
     def createL(self, lda):
-        """
-        Create operator L matrix at a fixed Lambda from K and flda**(0)
+        """Create operator L matrix at a fixed Lambda from K and flda**(0).
 
         Parameter
         ---------
@@ -106,7 +100,7 @@ class OP(ABC):
             the eigenvalue
 
         Returns
-        --------
+        -------
         L : matrix
             operator evaluation @(lda,nu0)
         """
@@ -131,19 +125,19 @@ class OP(ABC):
         return L
 
     def createDL_ldax(self, vp):
-        r"""
-        Create Vector L1x for the bordered matrix. This vector is \(\partial_\lambda L x\)
-        computed at nu0.
+        r"""Create Vector L1x for the bordered matrix.
+
+        This vector is \(\partial_\lambda L x\) computed at nu0.
 
         The derivative with respect to lda is computed using using K, flda and dlda_flda
 
         Parameters
-        -----------
+        ----------
         vp : Eig
             the eigenvalue object
 
         Returns
-        --------
+        -------
         L1x : vector
             \( \partial_\lambda L x \) computed at (nu0, lda)
         """
@@ -166,10 +160,9 @@ class OP(ABC):
     def getRHS(self, vp, n):
         """Compute RHS vector as defined in the Andrew, Chu, Lancaster method.
 
-        Function of L, D and derivative of eigenvalue and eigenvector
-        La fonction dépend surement de nu, L, D et des dérivées des vp et VP
-        RHS must be coherent with the chosed solver (scipy, petsc)
-
+        The computation might depend on nu, L, the number of derivatives and the eigenvalue
+        and eigenvector derivatives. The concrete implementation of the
+        RHS must be consistent with the chosen library (scipy, petsc, ...).
 
         Symbolic computation of the RHS for polynomial and generalized polynomial eigenvalue
         problem :
@@ -229,16 +222,15 @@ class OP(ABC):
             for (mi, m) in enumerate(mind):
                 # check if index belong to RHS
                 if (m not in skip_set):
-                    """ computing the operator derivative may be long, the matrix is cached
-                    until its derivation order change
-                    """
+                    # Computing the operator derivative may be long, the matrix is cached
+                    # until its derivation order change
                     if m[0] != m0old:
                         # if matrix order derivative has changed since last computation, compute it
                         dK_m0_ = self.dK[Kid](m[0])
                     if dK_m0_ is not int(0):
                         # if matrix derivative do not vanish...
                         dK_m0 = adaptMat(dK_m0_, lib)  # FIXME may be 0
-                        dx_m1 = adaptVec(vp.dx[m[1]], lib)       # normaly never 0
+                        dx_m1 = adaptVec(vp.dx[m[1]], lib)       # usually never 0
                         # compute the eigenvalue m[2]-th derivative, return 0 if skiped
                         if ntermi == 2:
                             F.obj -= dK_m0.dot(dx_m1.dot(mcoef[mi]))
@@ -252,11 +244,12 @@ class OP(ABC):
         return F.obj
 
     def createSolver(self, pb_type='gen', opts=None):
-        """ Factory function that create a eigSolver object. Computation are
-        delegated to the object define in `SOLVER_DICT`.
+        """Factory function that create a eigSolver object.
+
+        Computation are delegated to the object define in `SOLVER_DICT`.
 
         Parameters
-        -----------
+        ----------
         pb_type : string
             define the type of eigenvalue problem in \n
               - 'std': K[0] X = lda X
@@ -268,8 +261,103 @@ class OP(ABC):
         -------
         solver : EigSolver object
             the computation should be realize with the solver interface
-
         """
         lib = self._lib
         # create solver
         self.solver = OP.SOLVER_DICT[lib](self.K, pb_type)
+
+
+# Abstract class, not instanciable
+class OPmv(OP):
+    """Absract class to manage multivariate problems."""
+
+    def getRHS(self, vp, n):
+        """Compute RHS vector as defined in the Andrew, Chu, Lancaster method.
+
+        The computation might depend on nu, L, the number of derivatives and the eigenvalue
+        and eigenvector derivatives. The concrete implementation of the
+        RHS must be consistent with the chosen library (scipy, petsc, ...).
+
+
+        Symbolic computation of the RHS for polynomial and generalized polynomial eigenvalue
+        problem :
+
+        [K_0 + f_1(lda)*K_1 + ... + + f_n(lda)*K_n ]x=0
+
+        [K_0 + lda*K_1 + ... + + lda**n * K_n ]x=0
+
+        The operator should be described by 3 lists
+        K=[K0,K1,K2] that contains the operator matrix
+        dK=[dK0,dK1,dK2] that contains the derivatives of operator matrix
+        flda = [None, lin, quad] that contains the function of the eigenvalue. The function will
+        return their nth derivatives for general dependancy Faa di Bruno foruma should be used.
+
+        Parameters
+        ----------
+        vp : Eig
+            the eigenvalue object
+
+        Returns
+        -------
+        F.obj : vector (petsc,numpy,scipy)
+            the RHS vector is the good format
+        """
+        # use adapter !
+        lib = self._lib
+        # adapt the class interface to be independant of the library
+        x = adaptVec(vp.x, self._lib)
+
+        # init
+        F = adaptVec(x.duplicate(), lib)  # RHS same shape as eigenvector
+        F.set(0.)
+
+        # number of terms, usually 3 (K_i * f_i(lda) * xi), sometimes 2
+        NTERM = 3
+        # get number of variable involved in the derivatives
+        nvar = len(n)
+        # tuple to remove, because not in the RHS
+        #        (Matrix, eigenvector, eigenvalue)
+        # Remarks : the lda**(n) are remove in the lda_func
+        # skip2 = {(0, n)}     # K_0**(0) x**(n)
+        skip2 = {tuple([(0,)*nvar, n])}     # K_0**(0, ..., 0) x**(n1, ..., n_nvar)
+        # skip3 = {(0, n, 0)}  # K_1**(0) x**(n) dla**(0)
+        skip3 = {tuple([(0,)*nvar, n, (0,)*nvar])}  # K_1**(0, ..., 0) x**(n1, ...,n_nvar) dla**(0, ..., 0)
+
+        # Init matrix derivative index at previous step, to force 1st computation
+        m0old = -1
+        # loop over operator matrices
+        for (Kid, _) in enumerate(self.K):
+            # TODO caching the matrix
+            # How many terms for liebnitz 2 or 3
+            if self.flda[Kid] is None:
+                ntermi = NTERM - 1  # 2
+                skip_set = skip2
+            else:
+                ntermi = NTERM  # 3
+                skip_set = skip3
+
+            # multinomial index and coef
+            mind, mcoef = multinomial_multiindex_coefficients(ntermi, n)
+            for (mi, m) in enumerate(mind):
+                # check if index belong to RHS
+                if tuple(m) not in skip_set:
+                    # Computing the operator derivative may be long, the matrix is cached
+                    # until its derivation order change
+                    if m[0] != m0old:
+                        # if matrix order derivative has changed since last computation, compute it
+                        dK_m0_ = self.dK[Kid](*m[0])
+                    if dK_m0_ is not int(0):
+                        # if matrix derivative do not vanish...
+                        dK_m0 = adaptMat(dK_m0_, lib)  # FIXME may be 0
+                        dx_m1 = adaptVec(vp.dx[m[1]], lib)       # usually never 0
+                        # compute the eigenvalue m[2]-th derivative, return 0 if skiped
+                        if ntermi == 2:
+                            F.obj -= dK_m0.dot(dx_m1.dot(mcoef[mi]))
+                        else:
+                            # filter if lda**(n) or d_lda L lda**(n) because not in RHS
+                            dlda_m = self.flda[Kid](m[2], n, vp.dlda)
+                            if abs(dlda_m) != 0:
+                                F.obj -= dK_m0.dot(dx_m1.dot(dlda_m*mcoef[mi]))
+                m0old = m[0]
+        del m0old, dK_m0_, dK_m0, dx_m1
+        return F.obj

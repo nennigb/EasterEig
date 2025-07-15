@@ -349,6 +349,8 @@ def main(N=5):
 
     return EP1, vp1
 
+# Reference values from 10.1016/j.jcp.2020.109425 (using many dof)
+z_ref = [445.803 + 357.211j, 246.057 + 94.9156j, 165.134 + 44.1474j, 123.660 + 25.7198j]
 
 if __name__ == '__main__':
     """Show graphical outputs and reconstruction examples.
