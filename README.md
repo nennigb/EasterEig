@@ -15,7 +15,7 @@ The aim of this package is to **reconstruct** the eigenvalue loci and to **locat
 
 The theoretical parts of this work are described in [1] for the location of _exceptional points_ and in [2] for eigenvalues reconstruction. The extension to several parameters is presented in [3].
 
-The method requires the computation of successive derivatives of some selected eigenvalues with respect to the parameter so that, after recombination, regular functions can be constructed. This algebraic manipulation overcomes the convergence limits of conventional due to the singularity branch point. This enables
+The method requires the computation of successive derivatives of some selected eigenvalues with respect to the parameter so that, after recombination, regular functions can be constructed. This algebraic manipulation overcomes the convergence limits of conventional methods due to the singularity branch point. This enables
  * Fast approximation of eigenvalues, converging over a large region of parametric space
  * High order EP localization
  * Computation of the associated Puiseux series up to an arbitrary order
@@ -73,7 +73,7 @@ If you need to modify the code or the last development version, you need to buil
 
 If the variable `use_fpoly=false`, the fortran extension is skipped. If `use_fpoly=true`, the fortran extension is enabled. The evaluations of the PCP will be faster but a fortran compiler is required.
 
-Once you manualy get the sources, in the `eastereig` source folder (where there is the `meson.build` file), run
+Once you manualy get the sources, in the `eastereig` source folder (same folder as `meson.build` file), run
 ```console
 pip install -v . -Csetup-args=-Duse_fpoly=true
 ```
