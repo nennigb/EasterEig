@@ -19,21 +19,23 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11']
-        EASTEREIG_USE_FPOLY: ['True', 'False']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+        EASTEREIG_USE_FPOLY: ['true', 'false']
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v3.1.0
+    - uses: actions/checkout@main
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@main
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install numpy setuptools wheel
+        pip install build
+        # Required because we use editable install
+        pip install meson-python numpy
     # - name: Lint with flake8
     #   run: |
     #     pip install flake8
@@ -45,13 +47,18 @@ jobs:
       env: 
         EASTEREIG_USE_FPOLY: ${{ matrix.EASTEREIG_USE_FPOLY }}   
       run: |
-        pip install -e .
+        pip install -v --no-build-isolation --editable . -Csetup-args=-Duse_fpoly=$EASTEREIG_USE_FPOLY
         # Check if .so is there
         ls -lrt eastereig/fpoly
     - name: Run test without petsc
       run: |
         python -m eastereig
         python -c "from eastereig.fpoly import polyvalnd"
+#    - name: Try to build wheels
+#      env: 
+#        EASTEREIG_USE_FPOLY: ${{ matrix.EASTEREIG_USE_FPOLY }}       
+#      run: |
+#        python -m build . -Csetup-args=-Duse_fpoly=$EASTEREIG_USE_FPOLY     
 #    # Since pip 23.1 trouble with pip installation of petsc4py        
 #    - name: Install petsc and their dependencies (support for parallel matrices)
 #      run: |
