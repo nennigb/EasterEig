@@ -1,0 +1,148 @@
+name: Publish Python 🐍 distribution 📦 to PyPI and create a github release
+
+on:
+  push:
+#    branches: [ '*' ]
+    tags:
+      - 'v*'
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}-${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: false
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-13 is an intel runner, macos-14 is apple silicon 
+        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
+    steps:
+      - uses: actions/checkout@main
+
+      - name: Provide gfortran (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Use rtools distribution of mingw64
+          # based on https://github.com/scipy/scipy/blob/main/.github/workflows/windows.yml
+          choco install rtools -y --no-progress --force --version=4.0.0.20220206
+          echo "c:\rtools40\ucrt64\bin;" >> $env:GITHUB_PATH
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@main
+        env:
+          CIBW_SKIP: "pp* *-musllinux* *-win32 *i686 cp38* cp39*"
+          CIBW_ARCHS_WINDOWS: native
+          # Set `use_fpoly=true` to build fortran extension
+          CIBW_CONFIG_SETTINGS: setup-args="-Duse_fpoly=true"
+          # delocate-wheel ask to set the environment variable 'MACOSX_DEPLOYMENT_TARGET=13.0' to update minimum supported macOS for this wheel.
+          CIBW_ARCHS_MACOS: ${{ matrix.os == 'macos-14' && 'arm64' || 'x86_64' }}
+          CIBW_ENVIRONMENT_MACOS: >
+             CC=gcc-13 CXX=g++-13 FC=gfortran-13
+             MACOSX_DEPLOYMENT_TARGET=${{ matrix.os == 'macos-14' && '14.0' || '13.0' }}
+          # CIBW_ENVIRONMENT: "MACOSX_DEPLOYMENT_TARGET=13.0"          
+          CIBW_ENVIRONMENT_WINDOWS: CC=gcc CXX=g++ FC=gfortran
+#          CIBW_BEFORE_TEST: pip install pytest
+#          CIBW_TEST_COMMAND: "pytest --pyargs eastereig -v"
+          CIBW_TEST_COMMAND: "python -m eastereig.__main__"
+
+      - uses: actions/upload-artifact@main
+        with:
+          name: wheel-${{ matrix.os }} 
+          path: ./wheelhouse/*.whl
+
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+
+      - name: Build sdist
+        run: pipx run build --sdist -o wheelhouse
+
+      - uses: actions/upload-artifact@main
+        with:
+          name: sdist
+          path: wheelhouse/*.tar.gz
+
+
+  check_tag:
+    name: Check tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if head branch has a valid version tag
+        uses: actions-ecosystem/action-regex-match@v2
+        id: regex-match
+        with:
+          text: ${{ github.ref_name }}
+          regex: '^v[0-9]+.[0-9]+.[0-9]+'  # should we add final letters like 'beta'    
+
+      - uses: actions/checkout@main
+
+      - name: Compare the tag and the package version
+        env: 
+          MATCH: ${{ steps.regex-match.outputs.match }}
+        run: |
+          echo "trig on push with:" ${{ github.ref }}  # when trig on tag, contains the tag
+          echo "full branch name": ${{ github.ref_name }}
+          echo "package tag:" $(python eastereig/version.py)
+          echo "matched git tag:" $MATCH
+          if [[ v$(python eastereig/version.py) == $MATCH ]]; then   # In version.py no 'v' prefix
+            echo "tags are identical, continue..."
+            exit 0;
+          else 
+            echo "tags are different. Stop."
+            exit 1;
+          fi
+
+         
+  publish-to-pypi:
+    name: >-
+      Publish Python 🐍 distribution 📦 to PyPI
+    needs: [build_wheels, build_sdist, check_tag]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/eastereig  # Replace <package-name> with your PyPI project name
+    permissions:
+      id-token: write   # IMPORTANT mandatory for trusted publishing
+
+    steps:
+    - name: Download all the build artifacts
+      uses: actions/download-artifact@main
+      with:
+        path: wheelhouse/
+    - name: Collect all wheels in the same path
+      run: |
+        ls -Rlrt wheelhouse
+        mkdir wheelhouse/all
+        mv -f wheelhouse/*/* wheelhouse/all/
+        echo "All the available wheels are:"
+        ls -lrt wheelhouse/all        
+    - name: Publish distribution 📦 to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1     
+      with:
+        packages-dir: wheelhouse/all
+
+
+  github-release:
+    name: Create a GitHub Release
+    needs: publish-to-pypi
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # IMPORTANT: mandatory for making GitHub Releases
+      id-token: write  # IMPORTANT: mandatory for sigstore
+
+    steps:
+    - name: Create GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: >-
+        gh release create        
+        '${{ github.ref_name }}'
+        --repo '${{ github.repository }}'
+        --generate-notes
+        --title 'eastereig ${{ github.ref_name }}'                   
+
+
