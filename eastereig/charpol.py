@@ -1229,6 +1229,11 @@ class CharPol():
         # Check if there is too much solution
         bplp = pypolsys.polsys.bezout(singtol)
         print('> Bezout number :', bplp)
+        if bplp == 0:
+            raise ValueError(('Bezout number is vanishing. ' +
+                              f'Be sure the number of eigenvalues `{self.N}` is bigger than ' +
+                              f'the number of parameter `{n_var}`.'))
+
         if bplp > bplp_max:
             print('  `bplp` > `bplp_max` ({}). Abort. Increase `bplp_max` and try again.'.format(bplp_max))
             return bplp, None
