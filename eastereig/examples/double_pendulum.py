@@ -41,15 +41,20 @@ this approach is based on multivariate polynomial and numerical continuation.
 
 Examples
 --------
->>> C, sol, error = main() # doctest: +ELLIPSIS
+>>> C, sol, err_c, err_r1, err_r_all = main() # doctest: +ELLIPSIS
 > Solve PEP eigenvalue problem with NumpyEigSolver class...
->>> error[0] < 1e-4    # Starting point closer
+>>> err_c[0] < 1e-4    # Starting point closer
 True
->>> error[1] < 5e-2
+>>> err_c[1] < 5e-2    # Starting point farther
+True
+>>> err_r1 < 1e-4      # global error, closest EP
+True
+>>> err_r_all < 1e-2   # global error, all EP
 True
 """
 import numpy as np
 import eastereig as ee
+norm = np.linalg.norm
 
 # References solutions, obtained with https://github.com/nicolase7en/real-valued-ep2/coupled_pendulums.py
 # For real parameters
@@ -239,7 +244,7 @@ def main(plot=False):
     for vp in extracted:
         vp.getDerivativesMV(Nderiv, pendulum)
     # Build Charpol
-    C = ee.CharPol(extracted)
+    C = ee.CharPol.from_recursive_mult(extracted)
     # Find EP2 with Charpol at fixed c2
     C1 = C.set_param(1, c2_ref1)
     # C1 = C.set_param(1, c2_ref2)
@@ -249,12 +254,31 @@ def main(plot=False):
     # Compute the error vs the 2 EP
     i1 = np.argmin(abs(sol[:, 1] - l2_ref1))
     i2 = np.argmin(abs(sol[:, 1] - l2_ref2))
-    error = [abs(sol[i1, 1] - l2_ref1),
+    err_c = [abs(sol[i1, 1] - l2_ref1),
              abs(sol[i2, 1] - l2_ref2)]
-    return C, sol, error
+
+    # Compute real EP from a single initial guess
+    z0 = np.array([0.95 * lda_ref1, *(np.array((0.69+0.003j, 0.11+0.01j)))])
+    z = C.lm_from_sol(z0, real_param_ep=True)
+    # Check error with references solutions
+    err_r1 = [abs(z[0] - lda_ref1),
+              abs(z[1] - l2_ref1),
+              abs(z[2] - c2_ref1)]
+
+    # Compute real EP in a region
+    s = C.iterative_solve((None,
+                           (0.2, 0.8),
+                           (0.08, 0.17)), Npts=2,
+                          algorithm='lm', real_param_ep=True)
+    # Check error with references solutions
+    i1 = np.argmin(abs(s[:, 0] - lda_ref1))
+    i2 = np.argmin(abs(s[:, 0] - lda_ref2))
+    err_r_all = [s[i1, 0] - lda_ref1, s[i1, 1] - l2_ref1,  s[i1, 2] - c2_ref1,
+                 s[i2, 0] - lda_ref2, s[i2, 1] - l2_ref2,  s[i2, 2] - c2_ref2]
+    return C, sol, err_c,  norm(err_r1), norm(err_r_all)
 
 
 if __name__ == '__main__':
-    plot = True
-    C, sol, err = main(plot=False)
-    print(f'erreur={err}')
+    C, sol, err_c, err_r1, err_r_all = main(plot=False)
+    print(f'Error on real valued solver {np.linalg.norm(err_r1)}.')
+    print(f'Error on complex valued solver {min(err_c)}.')
