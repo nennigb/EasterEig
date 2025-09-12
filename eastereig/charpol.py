@@ -1047,7 +1047,8 @@ class CharPol():
         return self.iterative_solve(*args, **kargs)
 
     def iterative_solve(self, bounds, Npts=4, decimals=4, max_workers=4, tol=1e-4,
-                        verbose=False, algorithm='nr', chunksize=100):
+                        normalized=True, verbose=False, algorithm='nr',
+                        real_param_ep=False, chunksize=100):
         """Mesh parametric space and run iterative solver to find EP in parallel.
 
         Parameters
@@ -1074,6 +1075,10 @@ class CharPol():
         algorithm : string
             Can be either 'nr' for Newton-Raphson, either 'lm' for Levenberg-Marquard.
             The second is often more robust.
+        real_param_ep : bool
+            If `True`, the solver tries to find an EP of order (n/2 + 1) while
+            keeping the n parameters real. Currently, it is available only with
+            Levenberg-Marquard ('lm') solver.
         chunksize : int
             The size of computation grouped together and sent to workers for
             parallel execution.
@@ -1094,6 +1099,9 @@ class CharPol():
         if len(bounds) != len(self.nu0) + 1:
             raise IndexError('The length of `bounds` must match the number'
                              ' of unknown ({}).'.format(len(self.nu0) + 1))
+
+        if (algorithm == 'nr') and real_param_ep:
+            raise ValueError("The flag `real_param_ep=True` is available only with 'lm' algorithm.")
 
         def param_mesh(bound, Npts):
             Re, Im = np.meshgrid(np.linspace(bound[0].real, bound[1].real, Npts),
@@ -1119,13 +1127,14 @@ class CharPol():
         all_sol = []
 
         if algorithm == 'nr':
-            # use partial to fixed all function parameters except lda
+            # Use partial to fixed all function parameters except lda
             _p_solver = partial(self._newton, self.EP_system, self.jacobian, tol=tol,
                                 verbose=verbose, normalized=normalized)
         elif algorithm == 'lm':
-            _p_solver = partial(self.lm_from_sol, tol=tol, verbose=verbose)
+            _p_solver = partial(self.lm_from_sol, tol=tol, verbose=verbose,
+                                real_param_ep=real_param_ep)
         else:
-            raise NotImplementedError('The request algorithm `{}` is not recognized.'.format(algorithm))
+            raise NotImplementedError('The requested algorithm `{}` is not recognized.'.format(algorithm))
         total = np.prod([len(g) for g in grid])
         pbar = tqdm.tqdm(total=total, position=0, leave=True)
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
