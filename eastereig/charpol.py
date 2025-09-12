@@ -927,7 +927,8 @@ class CharPol():
             print('The maximal number of iteration has been reached.')
             return None
 
-    def lm_from_sol(self, z0, tol=1e-8, normalized=True, verbose=False):
+    def lm_from_sol(self, z0, tol=1e-8, normalized=True, verbose=False,
+                    real_param_ep=False):
         """Find EP with Levenberg-Marquard solver from single starting point.
 
         Based on scipy/MINPACK implementation of 'lm' through the scipy.optimize
@@ -946,6 +947,9 @@ class CharPol():
             for compatibility but not used.
         verbose : bool
             Print iteration log.
+        real_param_ep : bool
+            If `True`, the solver try to find an EP of order (n/2 + 1) while
+            keeping the n parameters real.
 
         Returns
         -------
@@ -967,7 +971,10 @@ class CharPol():
         def f_and_jac(x):
             """Split the EP system and the jacobian matrix into real and imag."""
             # Compute the Jac and the function from charpol (C)
-            nparam = len(z0)
+            nparam = len(z0)   # Contains lda + nu parameters
+            if real_param_ep:
+                # With n real parameters, target EP of order {(n/2) + 1}
+                nparam = nparam // 2 + 1
             z = to_z(x)
             Jc = self.jacobian(z)
             Fc = self.EP_system(z)
@@ -979,7 +986,7 @@ class CharPol():
                 eq_idr = eq_id * 2
                 Fr[eq_idr] = Fc[eq_id].real
                 Fr[eq_idr + 1] = Fc[eq_id].imag
-                for i in range(nparam):
+                for i in range(x.size // 2):
                     ir = i * 2
                     # Real part eqs
                     Jr[eq_idr, ir] = Jc[eq_id, i].real
@@ -987,6 +994,13 @@ class CharPol():
                     # Imag part eqs
                     Jr[eq_idr+1, ir] = Jc[eq_id, i].imag
                     Jr[eq_idr+1, ir+1] = Jc[eq_id, i].real
+
+            if real_param_ep:
+                # Add Im nu = 0
+                for i, eq_idr in enumerate(range(eq_idr + 2, eq_idr + 2 + len(self.nu0))):
+                    ir = 2*i + 3
+                    Fr[eq_idr] = x[ir]
+                    Jr[eq_idr, ir] = 1. # imag
             return Fr, Jr
 
         # see also hybr, sometimes beter ?
