@@ -31,7 +31,14 @@ and from which a subset of selected eigenvalues can be straightforwardly recover
 
 This polynomial is built from Vieta formulas and from the successive
 derivatives of a selected set of eigenvalues.
-[Vieta' formulas](https://en.wikipedia.org/wiki/Vieta%27s_formulas)
+[Vieta' formulas](https://en.wikipedia.org/wiki/Vieta%27s_formulas).
+
+Once created, the Partial Characteristic Polynomial allows
+  * to approximate the eigenvalue for instance with the `eval_lda_at` method;
+  * to locate EP with homotopy (`homotopy_solve`) or iterative (`iterative_solve`)
+    solver. With specific options in iterative solver, it is possible to get a set
+    of real valued parameters leading to exceptional points;
+  * and more.
 
 For more information about theoretical aspects see https://arxiv.org/abs/2505.06141.
 Be careful, in the code, ordering of sequences may be different from the paper.
@@ -1156,7 +1163,6 @@ class CharPol():
     def homotopy_solve(self, degree=None, tracktol=1e-12, finaltol=1e-8, singtol=1e-14,
                        dense=True, bplp_max=2000, oo_tol=1e-5, only_bezout=False, tol_filter=-1):
         """Solve EP system by homotopy method.
-
 
         This method defines a simplified interface to `pypolsys` homotopy
         solver.
