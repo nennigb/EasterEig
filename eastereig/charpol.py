@@ -94,13 +94,13 @@ class _SequentialExecutor():
     def __enter__(self, *args, **kargs):
         return self
 
-    def __exit__(*exc_info):
+    def __exit__(self, *exc_info):
         pass
 
     @staticmethod
     def map(fun, *iterable, **kargs):
         """Wrap the builtin function `map`."""
-        return map(fun, *iterable)
+        return map(fun, *iterable, **kargs)
 
 
 class CharPol():
@@ -966,6 +966,7 @@ class CharPol():
         """
         # set max iteration number
         niter_max = 100
+
         # Def few local function
         def to_z(x):
             """Convert the in-lined real and imag unknown `x` to complex unknown."""
