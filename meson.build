@@ -109,6 +109,7 @@ python_sources = [
     'eastereig/examples/WGimpedance_petsc.py',
     'eastereig/examples/WGimpedance_scipysp.py',
     'eastereig/examples/toy_3dof_2params.py',
+    'eastereig/examples/double_pendulum.py',
     'eastereig/fpoly/__init__.py',
     'eastereig/fpoly/_fpoly.py',
     'eastereig/fpoly/_fpolyval_full_py.py',
