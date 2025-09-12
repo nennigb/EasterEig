@@ -18,6 +18,7 @@
 """
 Coupled pendulum example.
 
+```
     #####################
         /           /
        /           /
@@ -28,7 +29,7 @@ Coupled pendulum example.
  ,─.         ,─.           | g
 ( m1)       ( m2)          v
  `-'         `-'
-
+```
 For a full description of the problem, see
 > N. Even, B. Nennig, G. Lefebvre and E. Perrey-Debain.
 > Experimental observation of exceptional points in coupled pendulums.
