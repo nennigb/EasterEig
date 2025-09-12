@@ -31,7 +31,14 @@ and from which a subset of selected eigenvalues can be straightforwardly recover
 
 This polynomial is built from Vieta formulas and from the successive
 derivatives of a selected set of eigenvalues.
-[Vieta' formulas](https://en.wikipedia.org/wiki/Vieta%27s_formulas)
+[Vieta' formulas](https://en.wikipedia.org/wiki/Vieta%27s_formulas).
+
+Once created, the Partial Characteristic Polynomial allows
+  * to approximate the eigenvalue for instance with the `eval_lda_at` method;
+  * to locate EP with homotopy (`homotopy_solve`) or iterative (`iterative_solve`)
+    solver. With specific options in iterative solver, it is possible to get a set
+    of real valued parameters leading to exceptional points;
+  * and more.
 
 For more information about theoretical aspects see https://arxiv.org/abs/2505.06141.
 Be careful, in the code, ordering of sequences may be different from the paper.
@@ -87,13 +94,13 @@ class _SequentialExecutor():
     def __enter__(self, *args, **kargs):
         return self
 
-    def __exit__(*exc_info):
+    def __exit__(self, *exc_info):
         pass
 
     @staticmethod
     def map(fun, *iterable, **kargs):
         """Wrap the builtin function `map`."""
-        return map(fun, *iterable)
+        return map(fun, *iterable, **kargs)
 
 
 class CharPol():
@@ -927,7 +934,8 @@ class CharPol():
             print('The maximal number of iteration has been reached.')
             return None
 
-    def lm_from_sol(self, z0, tol=1e-8, normalized=True, verbose=False):
+    def lm_from_sol(self, z0, tol=1e-8, normalized=True, verbose=False,
+                    real_param_ep=False):
         """Find EP with Levenberg-Marquard solver from single starting point.
 
         Based on scipy/MINPACK implementation of 'lm' through the scipy.optimize
@@ -946,6 +954,9 @@ class CharPol():
             for compatibility but not used.
         verbose : bool
             Print iteration log.
+        real_param_ep : bool
+            If `True`, the solver try to find an EP of order (n/2 + 1) while
+            keeping the n parameters real.
 
         Returns
         -------
@@ -955,6 +966,7 @@ class CharPol():
         """
         # set max iteration number
         niter_max = 100
+
         # Def few local function
         def to_z(x):
             """Convert the in-lined real and imag unknown `x` to complex unknown."""
@@ -967,7 +979,10 @@ class CharPol():
         def f_and_jac(x):
             """Split the EP system and the jacobian matrix into real and imag."""
             # Compute the Jac and the function from charpol (C)
-            nparam = len(z0)
+            nparam = len(z0)   # Contains lda + nu parameters
+            if real_param_ep:
+                # With n real parameters, target EP of order {(n/2) + 1}
+                nparam = nparam // 2 + 1
             z = to_z(x)
             Jc = self.jacobian(z)
             Fc = self.EP_system(z)
@@ -979,7 +994,7 @@ class CharPol():
                 eq_idr = eq_id * 2
                 Fr[eq_idr] = Fc[eq_id].real
                 Fr[eq_idr + 1] = Fc[eq_id].imag
-                for i in range(nparam):
+                for i in range(x.size // 2):
                     ir = i * 2
                     # Real part eqs
                     Jr[eq_idr, ir] = Jc[eq_id, i].real
@@ -987,6 +1002,13 @@ class CharPol():
                     # Imag part eqs
                     Jr[eq_idr+1, ir] = Jc[eq_id, i].imag
                     Jr[eq_idr+1, ir+1] = Jc[eq_id, i].real
+
+            if real_param_ep:
+                # Add Im nu = 0
+                for i, eq_idr in enumerate(range(eq_idr + 2, eq_idr + 2 + len(self.nu0))):
+                    ir = 2*i + 3
+                    Fr[eq_idr] = x[ir]
+                    Jr[eq_idr, ir] = 1. # imag
             return Fr, Jr
 
         # see also hybr, sometimes beter ?
@@ -1033,7 +1055,8 @@ class CharPol():
         return self.iterative_solve(*args, **kargs)
 
     def iterative_solve(self, bounds, Npts=4, decimals=4, max_workers=4, tol=1e-4,
-                        verbose=False, algorithm='nr', chunksize=100):
+                        normalized=True, verbose=False, algorithm='nr',
+                        real_param_ep=False, chunksize=100):
         """Mesh parametric space and run iterative solver to find EP in parallel.
 
         Parameters
@@ -1060,6 +1083,10 @@ class CharPol():
         algorithm : string
             Can be either 'nr' for Newton-Raphson, either 'lm' for Levenberg-Marquard.
             The second is often more robust.
+        real_param_ep : bool
+            If `True`, the solver tries to find an EP of order (n/2 + 1) while
+            keeping the n parameters real. Currently, it is available only with
+            Levenberg-Marquard ('lm') solver.
         chunksize : int
             The size of computation grouped together and sent to workers for
             parallel execution.
@@ -1080,6 +1107,9 @@ class CharPol():
         if len(bounds) != len(self.nu0) + 1:
             raise IndexError('The length of `bounds` must match the number'
                              ' of unknown ({}).'.format(len(self.nu0) + 1))
+
+        if (algorithm == 'nr') and real_param_ep:
+            raise ValueError("The flag `real_param_ep=True` is available only with 'lm' algorithm.")
 
         def param_mesh(bound, Npts):
             Re, Im = np.meshgrid(np.linspace(bound[0].real, bound[1].real, Npts),
@@ -1105,13 +1135,14 @@ class CharPol():
         all_sol = []
 
         if algorithm == 'nr':
-            # use partial to fixed all function parameters except lda
+            # Use partial to fixed all function parameters except lda
             _p_solver = partial(self._newton, self.EP_system, self.jacobian, tol=tol,
                                 verbose=verbose, normalized=normalized)
         elif algorithm == 'lm':
-            _p_solver = partial(self.lm_from_sol, tol=tol, verbose=verbose)
+            _p_solver = partial(self.lm_from_sol, tol=tol, verbose=verbose,
+                                real_param_ep=real_param_ep)
         else:
-            raise NotImplementedError('The request algorithm `{}` is not recognized.'.format(algorithm))
+            raise NotImplementedError('The requested algorithm `{}` is not recognized.'.format(algorithm))
         total = np.prod([len(g) for g in grid])
         pbar = tqdm.tqdm(total=total, position=0, leave=True)
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
@@ -1133,7 +1164,6 @@ class CharPol():
     def homotopy_solve(self, degree=None, tracktol=1e-12, finaltol=1e-8, singtol=1e-14,
                        dense=True, bplp_max=2000, oo_tol=1e-5, only_bezout=False, tol_filter=-1):
         """Solve EP system by homotopy method.
-
 
         This method defines a simplified interface to `pypolsys` homotopy
         solver.
@@ -1229,6 +1259,11 @@ class CharPol():
         # Check if there is too much solution
         bplp = pypolsys.polsys.bezout(singtol)
         print('> Bezout number :', bplp)
+        if bplp == 0:
+            raise ValueError(('Bezout number is vanishing. ' +
+                              f'Be sure the number of eigenvalues `{self.N}` is bigger than ' +
+                              f'the number of parameter `{n_var}`.'))
+
         if bplp > bplp_max:
             print('  `bplp` > `bplp_max` ({}). Abort. Increase `bplp_max` and try again.'.format(bplp_max))
             return bplp, None
