@@ -38,11 +38,12 @@ If eastereig is useful for your research, please cite the following references. 
 References
 ----------
 
-   [1] B. Nennig and E. Perrey-Debain. A high order continuation method to locate exceptional points and to compute Puiseux series with applications to acoustic waveguides. J. Comp. Phys., 109425, (2020). [[doi](https://dx.doi.org/10.1016/j.jcp.2020.109425)]; [[open access](https://arxiv.org/abs/1909.11579)]
+   [1] B. Nennig and E. Perrey-Debain. A high order continuation method to locate exceptional points and to compute Puiseux series with applications to acoustic waveguides. Journal of Computational Physics, 109425, (2020). [[doi](https://dx.doi.org/10.1016/j.jcp.2020.109425)]; [[open access](https://arxiv.org/abs/1909.11579)]
 
    [2] M. Ghienne and B. Nennig. Beyond the limitations of perturbation methods for real random eigenvalue problems using Exceptional Points and analytic continuation. Journal of Sound and vibration, (2020). [[doi](https://doi.org/10.1016/j.jsv.2020.115398)]; [[open access](https://hal.archives-ouvertes.fr/hal-02536849)]
    
-   [3] B. Nennig, Martin Ghienne, E. Perrey-Debain. Fast recovery of parametric eigenvalues depending on several parameters and location of high order exceptional points. arXiv 2505.06141, (2025). [[open access](https://arxiv.org/abs/2505.06141)]
+   [3] B. Nennig, Martin Ghienne, E. Perrey-Debain. Fast recovery of parametric eigenvalues depending on several parameters and location of high order exceptional points. Journal of Computational Physics, 551, pp.114692, (2026). [[doi](https://doi.org/10.1016/j.jcp.2026.114692)];[[open access](https://arxiv.org/abs/2505.06141)]
+
        
 Install 
 --------
