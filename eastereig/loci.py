@@ -33,11 +33,10 @@ Plot Riemann surface
 >>> RS.plotRiemann('Re',nooutput=True)[1] # doctest: +ELLIPSIS
 <...
 """
-
+import itertools as it
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
-import itertools as it
 
 
 class Loci:
@@ -49,11 +48,10 @@ class Loci:
         the 2D map of the parameter
     LAMBDA: (np.shape(NU),n_eig) list
             where n_eig is the number of eigenvalue
-
     """
 
     def __init__(self, LAMBDA=None, NU=None):
-        """Initialisation with numpy nd array."""
+        """Initialize with numpy arrays."""
         self.LAMBDA = LAMBDA
         self.NU = NU
 
@@ -62,29 +60,29 @@ class Loci:
         return "Instance of Loci class. Contains {}x{} nu map.".format(*self.NU.shape)
 
     @staticmethod
-    def reloadLoci(LAMBDAfile):
-        """Load from save npy file and return a Loci instance.
+    def reload(loci_file):
+        """Reload loci from a saved npz file.
 
         Parameters
         ----------
-        LAMBDAfile: string
-            the name of the file to reload
+        loci_file: string
+            The name of the file to reload
         """
-        npzfile = np.load(LAMBDAfile)  # where npzfile is a dict
+        npzfile = np.load(loci_file)  # where npzfile is a dict
         LAMBDA = npzfile['LAMBDA']
         NU = npzfile['NU']
         L = Loci(LAMBDA, NU)
         return L
 
-    def export(self, LAMBDAfile):
+    def export(self, loci_file):
         """Convert and export to numpy file format.
 
         Parameters
         ----------
-        LAMBDAfile: string
+        loci_file: string
             file to save the data
         """
-        np.savez(LAMBDAfile, LAMBDA=self.LAMBDA, NU=self.NU)
+        np.savez(loci_file, LAMBDA=self.LAMBDA, NU=self.NU)
 
     # %% Using matlab
     def plotRiemannMatlab(self, part, eng, n=3, label=[r'$\nu$', r'$\lambda']):
@@ -218,7 +216,7 @@ class Loci:
                         Zlim, linestyle='--', color=Couleur, linewidth=0.5)
                 shift = (Xlim[1]-Xlim[0])/40.
                 ax.text(EP_loc[i].real + shift, EP_loc[i].imag + shift,
-                        Zlim[0] + 2*shift, '$EP_%i$' % i, color=Couleur)
+                        Zlim[0] + 2*shift, f'$EP_{i}$', color=Couleur)
 
         # Fancy plot
         if Title != 'empty':
