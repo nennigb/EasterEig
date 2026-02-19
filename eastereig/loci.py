@@ -33,18 +33,14 @@ Plot Riemann surface
 >>> RS.plotRiemann('Re',nooutput=True)[1] # doctest: +ELLIPSIS
 <...
 """
-
+import itertools as it
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
-from mpl_toolkits.mplot3d import Axes3D
-
-import itertools as it
 
 
 class Loci:
-    """
-    Provides Riemann Surface plotting capability
+    """Provides Riemann Surface plotting capability.
 
     Attributes
     ----------
@@ -52,50 +48,45 @@ class Loci:
         the 2D map of the parameter
     LAMBDA: (np.shape(NU),n_eig) list
             where n_eig is the number of eigenvalue
-
     """
 
     def __init__(self, LAMBDA=None, NU=None):
-        """ Initialisation with numpy nd array.
-        """
-        # TODO add check on LAMDA to be consitent with plotting constaint
-        # TODO asarray ?
+        """Initialize with numpy arrays."""
         self.LAMBDA = LAMBDA
         self.NU = NU
 
     def __repr__(self):
-        """ Define the object representation.
-        """
+        """Define the object representation."""
         return "Instance of Loci class. Contains {}x{} nu map.".format(*self.NU.shape)
 
     @staticmethod
-    def reloadLoci(LAMBDAfile):
-        """ Load from save npy file and return a Loci instance
+    def reload(loci_file):
+        """Reload loci from a saved npz file.
 
         Parameters
         ----------
-        LAMBDAfile: string
-            the name of the file to reload
+        loci_file: string
+            The name of the file to reload
         """
-        npzfile = np.load(LAMBDAfile)  # where npzfile is a dict
+        npzfile = np.load(loci_file)  # where npzfile is a dict
         LAMBDA = npzfile['LAMBDA']
         NU = npzfile['NU']
         L = Loci(LAMBDA, NU)
         return L
 
-    def export(self, LAMBDAfile):
-        """ Convert and export to numpy file format.
+    def export(self, loci_file):
+        """Convert and export to numpy file format.
 
         Parameters
         ----------
-        LAMBDAfile: string
+        loci_file: string
             file to save the data
         """
-        np.savez(LAMBDAfile, LAMBDA=self.LAMBDA, NU=self.NU)
+        np.savez(loci_file, LAMBDA=self.LAMBDA, NU=self.NU)
 
     # %% Using matlab
     def plotRiemannMatlab(self, part, eng, n=3, label=[r'$\nu$', r'$\lambda']):
-        """ Plot Riemman surfaces with matlab [optional].
+        """Plot Riemman surfaces with matlab [optional].
 
         Remarks
         -------
@@ -107,7 +98,7 @@ class Loci:
         `PlotRiemann` (full python) must be prefered.
 
         Parameters
-        -----------
+        ----------
         part: {'Re','Im'}
             Specify which part of the complex parameter is plotted
         eng: matlab engine instance
@@ -119,8 +110,8 @@ class Loci:
         """
         try:
             from ME4pyUtils import np2mlarray
-        except ModuleNotFoundError:
-            raise ModuleNotFoundError('This optional method requires ME4pyUtils.')
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError('This optional method requires ME4pyUtils.') from exc
 
         # extract the real or imaginary part
         if part == 'Re':
@@ -137,16 +128,18 @@ class Loci:
     # %% Using matplotlib
     def plotRiemann(self, Type='Re', N=2, EP_loc=None, Title='empty',
                     Couleur='k', variable='\\nu', fig=-2, nooutput=False):
-        """ Plot Riemman surfaces of the selected eigenvalues.
+        """Plot Riemman surfaces of the selected eigenvalues.
 
         The real or imaginary part of the values to be plotted are sorted and
         the delaunay tessalation are used to draw possibility dicontinuous
         surfaces.
 
         Parameters
-        -----------
-        Type : {'Re','Im'}, default: 'Re'
-            Specify which part of the complex parameter is plotted.
+        ----------
+        Type : {'Re','Im', 'Im_abs', 'Re_abs'}, default: 'Re'
+            Specify which part of the complex parameter is plotted and the
+            ordering used. If `abs_*` is selected, the ordering use absolute
+            value. This is usefull when +- solutions are present.
         N : int, default: 2
             Maximum number of eigenvalues to be plotted.
         EP_loc : (N-1,) array_like
@@ -169,7 +162,8 @@ class Loci:
             The pyplot fig.
         ax: axes
             The pyplot axes for futher plot.
-
+        ldaplot: array
+            The eigenvalues as sorted for plotting.
         """
         # TODO : Add plotting option to plot the intersection of the Riemann surface
         # with a given plane (for instance with the real plane to illustrate real
@@ -192,6 +186,8 @@ class Loci:
             indx = np.argsort(np.abs(lda.imag), axis=2)
         elif Type == 'Re_abs':
             indx = np.argsort(np.abs(lda.real), axis=2)
+        else:
+            raise ValueError(f'The Type `{Type}` is not recognized.')
         ldaplot = np.take_along_axis(lda, indx, axis=2)
 
         # u, v = np.meshgrid(Pr, nui)
@@ -218,9 +214,9 @@ class Loci:
             for i in range(len(EP_loc)):
                 ax.plot([EP_loc[i].real, EP_loc[i].real], [EP_loc[i].imag, EP_loc[i].imag],
                         Zlim, linestyle='--', color=Couleur, linewidth=0.5)
-                shift = ((Xlim[1]-Xlim[0])/40.)
+                shift = (Xlim[1]-Xlim[0])/40.
                 ax.text(EP_loc[i].real + shift, EP_loc[i].imag + shift,
-                        Zlim[0] + 2*shift, '$EP_%i$' % i, color=Couleur)
+                        Zlim[0] + 2*shift, f'$EP_{i}$', color=Couleur)
 
         # Fancy plot
         if Title != 'empty':
@@ -232,15 +228,14 @@ class Loci:
             ax.set_zlabel(r'$\mathrm{Re} \lambda $')
         else:
             ax.set_zlabel(r'$\mathrm{Im} \lambda $')
-        if not(nooutput):
+        if not nooutput:
             plt.show()
-        return Fig, ax
+        return Fig, ax, ldaplot
 
     def plotDiscriminant(self, index=None, variable='\\nu', scale='log',
                          normalize=True, fig=None, clip=(0.01, 0.99),
                          cmap=plt.cm.turbo, gradient=False):
-        r"""Plot of the modulus of the discriminant of the 'partial'
-        characteristic polynomial.
+        r"""Plot of the modulus of the discriminant of the PCP.
 
         This analytic function vanishes for all multiple roots and is
         defined as
@@ -251,7 +246,7 @@ class Loci:
         to 'nan'. To limit that, complex256 are used locally.
 
         Parameters
-        -----------
+        ----------
         index : array_like
             The index of the eigenvalue to combine. The default is `None` (all).
         variable : str
@@ -281,14 +276,12 @@ class Loci:
         ax_g : axes, optional
             The pyplot axes of the gradient if `gradient=True`, else `None`.
         """
-
         lda = np.asarray(self.LAMBDA)
         nur = self.NU.real
         nui = self.NU.imag
 
         if np.shape(lda)[:2] != np.shape(nur) != np.shape(nui):
-            print('Warning : lda, nur and nui shapes are not consistent')
-            return
+            raise ValueError('Warning: lda, nur and nui shapes are not consistent')
 
         # Normalize lda to limit Overflow
         if normalize:
@@ -318,6 +311,8 @@ class Loci:
             im = plt.pcolormesh(nur, nui, field, zorder=-1, cmap=cmap)
             stats = (field.min(), field.max(), field.mean())
             print('> stats:', stats)
+        else:
+            raise ValueError(f'The scale `{scale}` is not recognized.')
         # im = plt.pcolormesh(nur, nui, P.imag, zorder=-1)
         plt.xlabel(r'$\mathrm{Re}\,' + variable + r' $')
         plt.ylabel(r'$\mathrm{Im}\,' + variable + r' $')
@@ -335,12 +330,11 @@ class Loci:
             ax_g = None
         return Fig, ax, ax_g
 
-
-
-# %% Using pyvista
+    # %% Using pyvista
     def plotRiemannPyvista(self, Type='Re', N=2, Title='empty',
-                           variable='\\nu', lda_list=None, qt=True, normalize=1.):
-        """ Plot Riemman surfaces of the selected eigenvalues using pyvista.
+                           variable='\\nu', lda_list=None, qt=True, normalize=1.,
+                           clim=None, screenshot_scale=2):
+        r"""Plot Riemman surfaces of the selected eigenvalues using pyvista.
 
         The real or imaginary part of the values to be plotted are sorted and
         the delaunay tessalation are used to draw possibility dicontinuous
@@ -353,20 +347,23 @@ class Loci:
             't' allows to toogle to 'points' representation
             'w' allows to toogle to 'wireframe' representation
             's' allows to toogle to 'surface' representation
+            'h' hide all widgets and axis labels.
             'q' to quit.
 
         If the differents surfaces are needed, they can be access to the
         Plotter properties `_datasets`.
 
         Parameters
-        -----------
-        Type : {'Re','Im'}, default: 'Re'
-            Specify which part of the complex parameter is plotted.
+        ----------
+        Type : {'Re','Im', 'Im_abs', 'Re_abs'}, default: 'Re'
+            Specify which part of the complex parameter is plotted and the
+            ordering used. If `abs_*` is selected, the ordering use absolute
+            value. This is usefull when +- solutions are present.
         N : int, default: 2
             Maximum number of eigenvalues to be plotted.
         Title : str, default: 'empty'
             Figure title.
-        variable : str, default: '\\nu'
+        variable : str, default: '\nu'
             Variable name for axis labels.
         qt : bool
             Flag to swtich between `pyvista` and `pyvistaqt`. It allows to plot
@@ -374,6 +371,10 @@ class Loci:
         normalize: float, optional
             Normalize the eigenvalue using the `normalize` scaling constant. The
             default is 1.
+        clim: tuple|None, optional
+            Fix the colorscale limits. If `None` let pyvista autoadjust the bounds.
+        screenshot_scale: int
+            The scale used when a screenshot is saved.
 
         Returns
         -------
@@ -381,6 +382,8 @@ class Loci:
             The pyvista plotter object.
         picked: list
             The list of the coordinates of the picked points.
+        ldaplot: array
+            The eigenvalues as sorted for plotting.
         """
         try:
             import pyvista as pv
@@ -388,21 +391,23 @@ class Loci:
             if qt:
                 try:
                     from pyvistaqt import BackgroundPlotter as Plotter
-                except ModuleNotFoundError:
-                    print('The module `pyvistaqt` is not installed. Set `qt=False`.')
+                except ModuleNotFoundError as exc:
+                    raise ModuleNotFoundError(
+                        'The module `pyvistaqt` is not installed. Set `qt=False`.'
+                        ) from exc
             else:
                 Plotter = pv.Plotter
-        except ModuleNotFoundError:
-            print('The module `pyvista` is not installed.')
-            return
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError('The module `pyvista` is not installed.') from exc
 
         # Default size of the check box
-        Startpos = 12
+        startpos = 12
         size = 50
 
         # Define a Class to hide or add an actor
         class SetVisibilityCallback:
             """Helper callback to keep a reference to the actor being modified."""
+
             def __init__(self, actor):
                 self.actor = actor
 
@@ -414,11 +419,10 @@ class Loci:
                     p.remove_actor(self.actor)
                 p.update_bounds_axes()
 
-
         # Recast data for plotting
         if lda_list is not None:
             lda = np.asarray(self.LAMBDA[:, :, lda_list])
-            if N> len(lda_list): N=len(lda_list)
+            N = min(N, len(lda_list))
         else:
             lda = np.asarray(self.LAMBDA)
         nur = self.NU.real
@@ -437,6 +441,8 @@ class Loci:
             indx = np.argsort(np.abs(lda.imag), axis=2)
         elif Type == 'Re_abs':
             indx = np.argsort(np.abs(lda.real), axis=2)
+        else:
+            raise ValueError(f'The Type `{Type}` is not recognized.')
         ldaplot = np.take_along_axis(lda, indx, axis=2)
 
         # u, v = np.meshgrid(Pr, nui)
@@ -444,36 +450,43 @@ class Loci:
 
         # Create all the surfaces
         surfs = []
-        col_name = {'Re': 'Im λ', 'Im': 'Re λ'}
+        col_name = {'Re': 'Im λ', 'Re_abs': 'Im λ', 'Im': 'Re λ', 'Im_abs': 'Re λ'}
         for mode in range(min(len(lda), N)):
-            if Type == 'Re':
+            if 'Re' in Type:
                 points = np.column_stack([u, v,  normalize * ldaplot[:, :, mode].ravel().real])
                 col = ldaplot[:, :, mode].ravel().imag
-            elif Type == 'Im':
+            elif 'Im' in Type:
                 points = np.column_stack([u, v,  normalize * ldaplot[:, :, mode].ravel().imag])
                 col = ldaplot[:, :, mode].ravel().real
+            else:
+                raise ValueError(f'The Type `{Type}` is not recognized.')
             cloud = pv.PolyData(points)
             cloud[col_name[Type]] = col
             # Triangulate parameter space using Delaunay triangulation
             surfs.append(cloud.delaunay_2d())
 
         # Add them to the plotter object
-        p = Plotter(title='Riemann surface')
+        p = Plotter(title='Riemann surface', image_scale=screenshot_scale)
+        p.enable_anti_aliasing()
+        light = pv.Light(light_type='headlight')
+        p.add_light(light)
         actors = []
         for surf in surfs:
             actors.append(p.add_mesh(surf, show_edges=True, pickable=True,
-                                     render_points_as_spheres=True, point_size=10.0))
+                                     lighting=True,
+                                     render_points_as_spheres=True, point_size=12.0,
+                                     clim=clim))
 
         # Add a check box for all actors
         for actor in actors:
             callback = SetVisibilityCallback(actor)
             p.add_checkbox_button_widget(callback, value=True,
-                                         position=(5.0, Startpos), size=size,
+                                         position=(5.0, startpos), size=size,
                                          border_size=1,
                                          color_on='red',
                                          color_off='grey',
                                          background_color='grey')
-            Startpos = Startpos + size + (size // 10)
+            startpos = startpos + size + (size // 10)
 
         # Define the scale slider
         def scale(zscale):
@@ -483,18 +496,18 @@ class Loci:
 
         # Define axis layout
         # FIXME still trouble with tex and utf8 chars...
-        xlabel = u'Re ν'
+        xlabel = 'Re ν'
         ylabel = 'Im \u03bd'
-        if Type == 'Re':
+        if 'Re' in Type:
             zlabel = 'Re λ'
         else:
             zlabel = 'Im λ'
         # axes_actor.SetXAxisLabelText(xlabel)
-        p.show_grid(xlabel=xlabel, ylabel=ylabel, zlabel=zlabel)
+        grid = p.show_grid(xtitle=xlabel, ytitle=ylabel, ztitle=zlabel)
 
         # Define picker
         # Add a picker label style
-        dargs = dict(name='labels', font_size=24)
+        dargs = {'name': 'labels', 'font_size': 24}
         picked = []
         def picker_callback(pid):
             """Plot the picked node label."""
@@ -503,10 +516,12 @@ class Loci:
             p.add_point_labels(pid, [label], **dargs)
             picked.append(pid)
 
-        p.enable_point_picking(callback=picker_callback, show_message=True,
-                               color='pink', point_size=15,
-                               show_point=True)
-
+        def enable_point_picking():
+            p.enable_point_picking(callback=picker_callback, show_message=True,
+                                   color='pink', point_size=15,
+                                   clear_on_no_selection=True,
+                                   show_point=True)
+        enable_point_picking()
         # TODO add a clip-box widget
         # p.add_mesh_clip_box(surfs[0], color='white')
 
@@ -517,7 +532,28 @@ class Loci:
                 prop = actor.GetProperty()
                 prop.SetRepresentationToPoints()
             p.update()
+
         p.add_key_event('t', toogle_to_point)
+
+        # Add a key to hide all dirty stuff
+        def toogle_to_hide():
+            """Toogle to hide all dirty stuff..."""
+            print('toogle')
+            if toogle_to_hide.hide:
+                p.add_actor(grid)
+                slider.EnabledOn()
+                enable_point_picking()
+            else:
+                p.remove_actor(grid)
+                slider.EnabledOff()
+                p.disable_picking()
+            toogle_to_hide.hide = not toogle_to_hide.hide
+            p.update()
+
+        # Store the state in the function
+        toogle_to_hide.hide = False
+        p.add_key_event('h', toogle_to_hide)
+
         p.show()  # auto_close=True,
 
-        return p, picked
+        return p, picked, ldaplot
