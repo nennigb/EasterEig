@@ -637,7 +637,7 @@ class CharPol():
         # Compute a_n at nu
         for n, a in enumerate(self.dcoefs):
             # an[n] = pu._valnd(polyval, a, *nu)
-            an[n] = polyvalnd(nu, a[slices])
+            an[n] = polyvalnd(nu, a[slices]).item()
 
         # Compute the derivtaive with respect to lda
 
@@ -653,7 +653,7 @@ class CharPol():
             dan = an[slice(0, deg-n)] * np.prod(DA[0:(n+1), slice(0, deg-n)], 0)
             # np.polyval start by high degree
             # np.polynomial.polynomial.polyval start by low degree!!!
-            v[n] = polyvalnd(lda, dan[::-1])
+            v[n] = polyvalnd(lda, dan[::-1]).item()
 
         return v
 
@@ -789,7 +789,7 @@ class CharPol():
                     # and fill it with the shifted the coef matrix
                     da = a[da_slice[row, col]] * der_coef[row, col]
                     # an[n] = pu._valnd(polyval, da, *nu)
-                    an[n] = polyvalnd(nu, da[slices])
+                    an[n] = polyvalnd(nu, da[slices]).item()
                 # apply derivative with respect to lda
                 if col == 0:
                     # Increase the derivation order
@@ -802,7 +802,7 @@ class CharPol():
                     # np.polyval start by high degree
                     # np.polynomial.polynomial.polyval start by low degree!!!
                 # J[row, col] = polyval(lda, dan[::-1])
-                J[row, col] = polyvalnd(lda, dan[::-1])
+                J[row, col] = polyvalnd(lda, dan[::-1]).item()
         return J
 
     def eval_at(self, vals):
@@ -851,7 +851,7 @@ class CharPol():
         # Compute a_n at nu
         for n, a in enumerate(self.dcoefs):
             # an[n] = pu._valnd(polyval, a, *nu)
-            an[n] = polyvalnd(nu, a)
+            an[n] = polyvalnd(nu, a).item()
 
         # np.polyval start by high degree
         # np.polynomial.polynomial.polyval start by low degree!!!
