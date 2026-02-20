@@ -14,8 +14,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-13 is an intel runner, macos-14 is apple silicon 
-        os: [ubuntu-latest, windows-latest, macos-14]
+        # Now ARM64-based (macOS 15+)
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@main
 
@@ -35,14 +35,16 @@ jobs:
           # Set `use_fpoly=true` to build fortran extension
           CIBW_CONFIG_SETTINGS: setup-args="-Duse_fpoly=true"
           # delocate-wheel ask to set the environment variable 'MACOSX_DEPLOYMENT_TARGET=13.0' to update minimum supported macOS for this wheel.
-          CIBW_ARCHS_MACOS: ${{ matrix.os == 'macos-14' && 'arm64' || 'x86_64' }}
+          CIBW_ARCHS_MACOS: "x86_64 arm64"  # through cross compilation
           CIBW_ENVIRONMENT_MACOS: >
-             CC=gcc-13 CXX=g++-13 FC=gfortran-13
-             MACOSX_DEPLOYMENT_TARGET=${{ matrix.os == 'macos-14' && '14.0' || '13.0' }}
+             CC=gcc-15 CXX=g++-15 FC=gfortran-15
+             MACOSX_DEPLOYMENT_TARGET='11.0'
           # CIBW_ENVIRONMENT: "MACOSX_DEPLOYMENT_TARGET=13.0"          
           CIBW_ENVIRONMENT_WINDOWS: CC=gcc CXX=g++ FC=gfortran
 #          CIBW_BEFORE_TEST: pip install pytest
 #          CIBW_TEST_COMMAND: "pytest --pyargs eastereig -v"
+          # Skip tests for any macOS wheel that is x86_64 since runner is arm
+          CIBW_TEST_SKIP: "*-macosx_x86_64"
           CIBW_TEST_COMMAND: "python -m eastereig.__main__"
 
       - uses: actions/upload-artifact@main
