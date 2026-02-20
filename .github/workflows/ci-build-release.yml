@@ -33,7 +33,7 @@ jobs:
           # Set `use_fpoly=true` to build fortran extension
           CIBW_CONFIG_SETTINGS: setup-args="-Duse_fpoly=true"
           # delocate-wheel ask to set the environment variable 'MACOSX_DEPLOYMENT_TARGET=13.0' to update minimum supported macOS for this wheel.
-          CIBW_ARCHS_MACOS: "x86_64 arm64"  # through cross compilation
+          CIBW_ARCHS_MACOS: "arm64"  # through cross compilation
           CIBW_ENVIRONMENT_MACOS: >
              CC=gcc-15 CXX=g++-15 FC=gfortran-15
              MACOSX_DEPLOYMENT_TARGET='11.0'
