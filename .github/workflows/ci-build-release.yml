@@ -2,9 +2,7 @@ name: Publish Python 🐍 distribution 📦 to PyPI and create a github release
 
 on:
   push:
-#    branches: [ '*' ]
-    tags:
-      - 'v*'
+    branches: [ '*' ]
 
 jobs:
   build_wheels:
@@ -14,8 +12,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-13 is an intel runner, macos-14 is apple silicon 
-        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
+        # Now ARM64-based (macOS 15+)
+        os: [macos-latest]
     steps:
       - uses: actions/checkout@main
 
@@ -35,14 +33,16 @@ jobs:
           # Set `use_fpoly=true` to build fortran extension
           CIBW_CONFIG_SETTINGS: setup-args="-Duse_fpoly=true"
           # delocate-wheel ask to set the environment variable 'MACOSX_DEPLOYMENT_TARGET=13.0' to update minimum supported macOS for this wheel.
-          CIBW_ARCHS_MACOS: ${{ matrix.os == 'macos-14' && 'arm64' || 'x86_64' }}
+          CIBW_ARCHS_MACOS: "arm64"  # through cross compilation
           CIBW_ENVIRONMENT_MACOS: >
-             CC=gcc-13 CXX=g++-13 FC=gfortran-13
-             MACOSX_DEPLOYMENT_TARGET=${{ matrix.os == 'macos-14' && '14.0' || '13.0' }}
+             CC=gcc-15 CXX=g++-15 FC=gfortran-15
+             MACOSX_DEPLOYMENT_TARGET='11.0'
           # CIBW_ENVIRONMENT: "MACOSX_DEPLOYMENT_TARGET=13.0"          
           CIBW_ENVIRONMENT_WINDOWS: CC=gcc CXX=g++ FC=gfortran
 #          CIBW_BEFORE_TEST: pip install pytest
 #          CIBW_TEST_COMMAND: "pytest --pyargs eastereig -v"
+          # Skip tests for any macOS wheel that is x86_64 since runner is arm
+          CIBW_TEST_SKIP: "*-macosx_x86_64"
           CIBW_TEST_COMMAND: "python -m eastereig.__main__"
 
       - uses: actions/upload-artifact@main
@@ -65,84 +65,5 @@ jobs:
           name: sdist
           path: wheelhouse/*.tar.gz
 
-
-  check_tag:
-    name: Check tag
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check if head branch has a valid version tag
-        uses: actions-ecosystem/action-regex-match@v2
-        id: regex-match
-        with:
-          text: ${{ github.ref_name }}
-          regex: '^v[0-9]+.[0-9]+.[0-9]+'  # should we add final letters like 'beta'    
-
-      - uses: actions/checkout@main
-
-      - name: Compare the tag and the package version
-        env: 
-          MATCH: ${{ steps.regex-match.outputs.match }}
-        run: |
-          echo "trig on push with:" ${{ github.ref }}  # when trig on tag, contains the tag
-          echo "full branch name": ${{ github.ref_name }}
-          echo "package tag:" $(python eastereig/version.py)
-          echo "matched git tag:" $MATCH
-          if [[ v$(python eastereig/version.py) == $MATCH ]]; then   # In version.py no 'v' prefix
-            echo "tags are identical, continue..."
-            exit 0;
-          else 
-            echo "tags are different. Stop."
-            exit 1;
-          fi
-
-         
-  publish-to-pypi:
-    name: >-
-      Publish Python 🐍 distribution 📦 to PyPI
-    needs: [build_wheels, build_sdist, check_tag]
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/eastereig  # Replace <package-name> with your PyPI project name
-    permissions:
-      id-token: write   # IMPORTANT mandatory for trusted publishing
-
-    steps:
-    - name: Download all the build artifacts
-      uses: actions/download-artifact@main
-      with:
-        path: wheelhouse/
-    - name: Collect all wheels in the same path
-      run: |
-        ls -Rlrt wheelhouse
-        mkdir wheelhouse/all
-        mv -f wheelhouse/*/* wheelhouse/all/
-        echo "All the available wheels are:"
-        ls -lrt wheelhouse/all        
-    - name: Publish distribution 📦 to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1     
-      with:
-        packages-dir: wheelhouse/all
-
-
-  github-release:
-    name: Create a GitHub Release
-    needs: publish-to-pypi
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write  # IMPORTANT: mandatory for making GitHub Releases
-      id-token: write  # IMPORTANT: mandatory for sigstore
-
-    steps:
-    - name: Create GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      run: >-
-        gh release create        
-        '${{ github.ref_name }}'
-        --repo '${{ github.repository }}'
-        --generate-notes
-        --title 'eastereig ${{ github.ref_name }}'                   
 
 
