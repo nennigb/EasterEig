@@ -2,9 +2,7 @@ name: Publish Python 🐍 distribution 📦 to PyPI and create a github release
 
 on:
   push:
-#    branches: [ '*' ]
-    tags:
-      - 'v*'
+    branches: [ '*' ]
 
 jobs:
   build_wheels:
@@ -15,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         # Now ARM64-based (macOS 15+)
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [macos-latest]
     steps:
       - uses: actions/checkout@main
 
@@ -67,84 +65,5 @@ jobs:
           name: sdist
           path: wheelhouse/*.tar.gz
 
-
-  check_tag:
-    name: Check tag
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check if head branch has a valid version tag
-        uses: actions-ecosystem/action-regex-match@v2
-        id: regex-match
-        with:
-          text: ${{ github.ref_name }}
-          regex: '^v[0-9]+.[0-9]+.[0-9]+'  # should we add final letters like 'beta'    
-
-      - uses: actions/checkout@main
-
-      - name: Compare the tag and the package version
-        env: 
-          MATCH: ${{ steps.regex-match.outputs.match }}
-        run: |
-          echo "trig on push with:" ${{ github.ref }}  # when trig on tag, contains the tag
-          echo "full branch name": ${{ github.ref_name }}
-          echo "package tag:" $(python eastereig/version.py)
-          echo "matched git tag:" $MATCH
-          if [[ v$(python eastereig/version.py) == $MATCH ]]; then   # In version.py no 'v' prefix
-            echo "tags are identical, continue..."
-            exit 0;
-          else 
-            echo "tags are different. Stop."
-            exit 1;
-          fi
-
-         
-  publish-to-pypi:
-    name: >-
-      Publish Python 🐍 distribution 📦 to PyPI
-    needs: [build_wheels, build_sdist, check_tag]
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/eastereig  # Replace <package-name> with your PyPI project name
-    permissions:
-      id-token: write   # IMPORTANT mandatory for trusted publishing
-
-    steps:
-    - name: Download all the build artifacts
-      uses: actions/download-artifact@main
-      with:
-        path: wheelhouse/
-    - name: Collect all wheels in the same path
-      run: |
-        ls -Rlrt wheelhouse
-        mkdir wheelhouse/all
-        mv -f wheelhouse/*/* wheelhouse/all/
-        echo "All the available wheels are:"
-        ls -lrt wheelhouse/all        
-    - name: Publish distribution 📦 to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1     
-      with:
-        packages-dir: wheelhouse/all
-
-
-  github-release:
-    name: Create a GitHub Release
-    needs: publish-to-pypi
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write  # IMPORTANT: mandatory for making GitHub Releases
-      id-token: write  # IMPORTANT: mandatory for sigstore
-
-    steps:
-    - name: Create GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      run: >-
-        gh release create        
-        '${{ github.ref_name }}'
-        --repo '${{ github.repository }}'
-        --generate-notes
-        --title 'eastereig ${{ github.ref_name }}'                   
 
 
