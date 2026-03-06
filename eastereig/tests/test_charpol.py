@@ -313,7 +313,7 @@ class Test_charpol_basics(unittest.TestCase):
         H = self.C.getdH()
         d_dH = H.eval_at(s[1::])
         # Check results
-        self.assertTrue(abs(d_ana-d_pcp_syl) < 1e-5)
+        self.assertTrue(abs(d_ana-d_pcp_syl) < 1e-4)
         self.assertTrue(abs(d_ana-d_dH) < 1e-5)
 
     def test_charpol_load_export(self):

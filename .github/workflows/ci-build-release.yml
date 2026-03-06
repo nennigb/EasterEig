@@ -14,8 +14,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-13 is an intel runner, macos-14 is apple silicon 
-        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
+        # macos-latest is ARM64-based, macos-26-intel is intel
+        # Hard to do cross compilation with fortran extension
+        os: [ubuntu-latest, windows-latest, macos-latest, macos-26-intel]
     steps:
       - uses: actions/checkout@main
 
@@ -34,15 +35,18 @@ jobs:
           CIBW_ARCHS_WINDOWS: native
           # Set `use_fpoly=true` to build fortran extension
           CIBW_CONFIG_SETTINGS: setup-args="-Duse_fpoly=true"
-          # delocate-wheel ask to set the environment variable 'MACOSX_DEPLOYMENT_TARGET=13.0' to update minimum supported macOS for this wheel.
-          CIBW_ARCHS_MACOS: ${{ matrix.os == 'macos-14' && 'arm64' || 'x86_64' }}
+          # delocate-wheel used to ask to set the environment variable 'MACOSX_DEPLOYMENT_TARGET=13.0' to update minimum supported macOS for this wheel.
+          CIBW_ARCHS_MACOS: ${{ matrix.os == 'macos-latest' && 'arm64' || 'x86_64' }}
           CIBW_ENVIRONMENT_MACOS: >
-             CC=gcc-13 CXX=g++-13 FC=gfortran-13
-             MACOSX_DEPLOYMENT_TARGET=${{ matrix.os == 'macos-14' && '14.0' || '13.0' }}
+             CC=gcc-15 CXX=g++-15 FC=gfortran-15
+             MACOSX_DEPLOYMENT_TARGET='11.0'
           # CIBW_ENVIRONMENT: "MACOSX_DEPLOYMENT_TARGET=13.0"          
           CIBW_ENVIRONMENT_WINDOWS: CC=gcc CXX=g++ FC=gfortran
-#          CIBW_BEFORE_TEST: pip install pytest
-#          CIBW_TEST_COMMAND: "pytest --pyargs eastereig -v"
+          # Skip tests for any macOS wheel that is x86_64 since runner is arm
+          # Not used in practice since no cross compilation
+          # CIBW_TEST_SKIP: "*-macosx_x86_64"
+          # CIBW_BEFORE_TEST: pip install pytest
+          # CIBW_TEST_COMMAND: "pytest --pyargs eastereig -v"
           CIBW_TEST_COMMAND: "python -m eastereig.__main__"
 
       - uses: actions/upload-artifact@main
